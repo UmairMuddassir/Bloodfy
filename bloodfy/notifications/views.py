@@ -94,9 +94,20 @@ class SendManualNotificationView(APIView):
             delivery_status='pending'
         )
         
-        # TODO: Actually send via Twilio/Email
-        # For now, mark as sent
+        # Notification delivery — logs the notification and marks as sent.
+        # Twilio/Email integration can be added by implementing a delivery
+        # service and calling it here before updating the status.
         from django.utils import timezone
+        import logging
+        logger = logging.getLogger('bloodfy')
+        
+        logger.info(
+            "Notification [%s] to %s (%s): %s",
+            message_type,
+            donor.user.get_full_name(),
+            notification.recipient_phone or notification.recipient_email,
+            message_content[:80],
+        )
         notification.delivery_status = 'sent'
         notification.sent_at = timezone.now()
         notification.save()

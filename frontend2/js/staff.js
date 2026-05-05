@@ -63,7 +63,7 @@ function renderStaffTable(users) {
         const statusLabel = user.is_active ? 'Active' : 'Inactive';
 
         // User profile image (fallback if not available)
-        const profileImage = user.profile_image || 'https://via.placeholder.com/35';
+        const profileImage = user.profile_image || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='35' height='35'%3E%3Ccircle cx='17.5' cy='17.5' r='17.5' fill='%23374151'/%3E%3Ctext x='17.5' y='22' text-anchor='middle' fill='%23F9FAFB' font-size='14' font-family='sans-serif'%3E${(user.first_name || 'U').charAt(0)}%3C/text%3E%3C/svg%3E`;
 
         row.innerHTML = `
             <td>

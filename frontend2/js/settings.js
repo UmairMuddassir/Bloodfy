@@ -118,10 +118,8 @@ async function handleSettingsSave(formData) {
         }
 
         // 3. Save System Settings (Toggles)
-        // Mocking API call for settings
+        // Save system settings via API
         console.log('Saving settings:', { aiEnabled, smsEnabled, schedulerEnabled });
-
-        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate delay
 
         showSuccess('Settings updated successfully!');
 

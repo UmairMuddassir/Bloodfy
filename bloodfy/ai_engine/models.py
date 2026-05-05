@@ -183,3 +183,141 @@ class AIModelMetrics(models.Model):
     
     def __str__(self):
         return f"AI Metrics for {self.date}: {self.accuracy_rate}% accuracy"
+
+
+class TriageLog(models.Model):
+    """
+    Audit log for every medical urgency triage assessment.
+    Stores both the input and the AI/rule-based output so admins
+    can review, override, and improve the system over time.
+    """
+
+    URGENCY_CHOICES = [
+        ('emergency', 'Emergency'),
+        ('urgent', 'Urgent'),
+        ('normal', 'Normal'),
+    ]
+
+    METHOD_CHOICES = [
+        ('rule_based', 'Rule-Based'),
+        ('llm', 'LLM-Powered'),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+
+    # Link to the blood request (optional — triage may be standalone)
+    blood_request = models.ForeignKey(
+        BloodRequest,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='triage_logs'
+    )
+
+    # Input data (stored as JSON for flexibility)
+    diagnosis = models.TextField(
+        verbose_name='Patient Diagnosis'
+    )
+    patient_age = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name='Patient Age'
+    )
+    units_required = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Units Required'
+    )
+    blood_group = models.CharField(
+        max_length=5,
+        verbose_name='Blood Group'
+    )
+    current_stock = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Available Stock at Assessment Time'
+    )
+
+    # Output / assessment
+    urgency_level = models.CharField(
+        max_length=20,
+        choices=URGENCY_CHOICES,
+        verbose_name='Assessed Urgency'
+    )
+    confidence = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        verbose_name='Confidence Score (0-1)'
+    )
+    reasoning = models.TextField(
+        verbose_name='Assessment Reasoning'
+    )
+    auto_escalate = models.BooleanField(
+        default=False,
+        verbose_name='Auto-Escalated'
+    )
+    recommended_actions = models.JSONField(
+        default=list,
+        verbose_name='Recommended Actions'
+    )
+    method = models.CharField(
+        max_length=20,
+        choices=METHOD_CHOICES,
+        default='rule_based',
+        verbose_name='Assessment Method'
+    )
+
+    # Admin override
+    admin_override_level = models.CharField(
+        max_length=20,
+        choices=URGENCY_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name='Admin Override Urgency'
+    )
+    overridden_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='triage_overrides',
+        verbose_name='Overridden By'
+    )
+    override_reason = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Override Reason'
+    )
+
+    # Who triggered it
+    assessed_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='triage_assessments',
+        verbose_name='Assessed By'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Triage Log'
+        verbose_name_plural = 'Triage Logs'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['urgency_level']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['method']),
+        ]
+
+    def __str__(self):
+        return f"Triage [{self.urgency_level.upper()}] — {self.blood_group} ({self.created_at:%Y-%m-%d %H:%M})"
+
+    @property
+    def effective_urgency(self):
+        """Return the admin override if set, otherwise the AI assessment."""
+        return self.admin_override_level or self.urgency_level

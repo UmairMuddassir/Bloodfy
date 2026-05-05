@@ -151,7 +151,7 @@ function displayUserInfo() {
         if (el) el.textContent = name;
     });
 
-    // 2. Update common header/profile spans (including hardcoded A. Hameed)
+    // 2. Update common header/profile spans with the authenticated user's name
     const profileSelectors = '.admin-profile span, .user-profile span, .header-user span, .user-info span, .user-name-display, .profile-name, .admin-name';
     document.querySelectorAll(profileSelectors).forEach(el => {
         const text = el.textContent.trim();

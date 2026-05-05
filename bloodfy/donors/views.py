@@ -94,8 +94,8 @@ class DonorRegisterView(APIView):
                     notification_type='donor_approval',
                     related_id=str(donor_request.id)
                 )
-        except Exception as e:
-            print(f"Error creating admin notification: {e}")
+        except Exception:
+            pass
         
         return created_response(
             data=DonorRequestSerializer(donor_request).data,
@@ -461,11 +461,6 @@ class DonorApprovalView(APIView):
             donor_request.reviewed_at = timezone.now()
             donor_request.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
             
-            return success_response(
-                data=DonorSerializer(donor).data,
-                message="Donor request approved successfully"
-            )
-            
             # Create notification for user
             try:
                 AppNotification.objects.create(
@@ -475,8 +470,13 @@ class DonorApprovalView(APIView):
                     notification_type='success',
                     related_id=str(donor.id)
                 )
-            except Exception as e:
-                print(f"Error creating user notification: {e}")
+            except Exception:
+                pass
+            
+            return success_response(
+                data=DonorSerializer(donor).data,
+                message="Donor request approved successfully"
+            )
         
         else:  # reject
             rejection_reason = serializer.validated_data.get('rejection_reason', '')
@@ -494,11 +494,6 @@ class DonorApprovalView(APIView):
             donor_request.rejection_reason = rejection_reason
             donor_request.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'rejection_reason'])
             
-            return success_response(
-                data=DonorRequestSerializer(donor_request).data,
-                message="Donor request rejected"
-            )
-            
             # Create notification for user
             try:
                 AppNotification.objects.create(
@@ -508,8 +503,13 @@ class DonorApprovalView(APIView):
                     notification_type='danger',
                     related_id=str(donor_request.id)
                 )
-            except Exception as e:
-                print(f"Error creating user notification: {e}")
+            except Exception:
+                pass
+            
+            return success_response(
+                data=DonorRequestSerializer(donor_request).data,
+                message="Donor request rejected"
+            )
 
 
 class AdminDonorCreateView(APIView):

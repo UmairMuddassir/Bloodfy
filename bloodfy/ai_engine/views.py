@@ -2,22 +2,29 @@
 AI Engine app views.
 """
 
+import logging
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 
-from .models import AIRanking, AIModelMetrics
+from .models import AIRanking, AIModelMetrics, TriageLog
 from .ranking_engine import process_blood_request, rank_donors_for_request
+from .triage_service import TriageService
+from .llm_provider import get_llm_provider
 from .serializers import (
     AIRankingListSerializer, RankDonorsRequestSerializer,
     RankDonorsResponseSerializer, AIModelMetricsSerializer,
-    ReactivationCheckSerializer, ReactivationResultSerializer
+    ReactivationCheckSerializer, ReactivationResultSerializer,
+    TriageRequestSerializer, TriageResponseSerializer,
+    TriageLogSerializer, TriageOverrideSerializer,
 )
 from requests_management.models import BloodRequest
 from donors.models import Donor
-from utils.responses import success_response, error_response
+from utils.responses import success_response, error_response, created_response
 from utils.permissions import IsAdmin
+
+logger = logging.getLogger('bloodfy')
 
 
 class RankDonorsView(APIView):
@@ -90,8 +97,42 @@ class RankDonorsView(APIView):
                 availability_status=True
             ).select_related('user')[:max_donors]
             
+            # Use real scoring functions for simulation
+            from .ranking_engine import (
+                haversine_distance, calculate_distance_score,
+                calculate_compatibility_score, calculate_responsiveness_score,
+                calculate_eligibility_score
+            )
+            from utils.constants import AI_RANKING_WEIGHTS
+            
+            # Default hospital coordinates (Lahore centre) for simulation
+            hospital_lat, hospital_lon = 31.5204, 74.3587
+            
             results = []
-            for i, donor in enumerate(donors, 1):
+            scored_donors = []
+            for donor in donors:
+                # Calculate real scores
+                d_lat = float(donor.latitude) if donor.latitude else hospital_lat
+                d_lon = float(donor.longitude) if donor.longitude else hospital_lon
+                dist_km = haversine_distance(hospital_lat, hospital_lon, d_lat, d_lon)
+                
+                compat_score = calculate_compatibility_score(donor.blood_group, blood_group)
+                dist_score = calculate_distance_score(dist_km)
+                resp_score = calculate_responsiveness_score(donor)
+                elig_score = calculate_eligibility_score(donor)
+                
+                final_score = (
+                    AI_RANKING_WEIGHTS['compatibility'] * compat_score +
+                    AI_RANKING_WEIGHTS['distance'] * dist_score +
+                    AI_RANKING_WEIGHTS['responsiveness'] * resp_score +
+                    AI_RANKING_WEIGHTS['eligibility'] * elig_score
+                )
+                scored_donors.append((donor, final_score, dist_km))
+            
+            # Sort by score descending
+            scored_donors.sort(key=lambda x: x[1], reverse=True)
+            
+            for i, (donor, score, dist_km) in enumerate(scored_donors, 1):
                 results.append({
                     'id': str(donor.id),
                     'donor': {
@@ -104,8 +145,8 @@ class RankDonorsView(APIView):
                         'city': donor.city,
                         'blood_group': donor.blood_group
                     },
-                    'score': 0.95 - (i * 0.05), # Mock score for simulation
-                    'distance': 2.5 + (i * 1.2), # Mock distance
+                    'score': round(score / 100, 4),
+                    'distance': round(dist_km, 2),
                     'rank_position': i
                 })
 
@@ -230,7 +271,7 @@ class AIMetricsView(APIView):
         metrics = AIModelMetrics.objects.order_by('-date')
         latest = metrics.first()
         
-        accuracy = float(latest.accuracy_rate) if latest else 0.925
+        accuracy = float(latest.accuracy_rate) if latest else 0
         
         serializer = AIModelMetricsSerializer(metrics[:30], many=True)
         
@@ -241,4 +282,175 @@ class AIMetricsView(APIView):
                 'count': metrics.count()
             },
             message="AI metrics retrieved"
+        )
+
+
+# =============================================================================
+# Medical Urgency Triage Views
+# =============================================================================
+
+class TriageAssessView(APIView):
+    """
+    POST /api/ai/triage/
+    Assess the medical urgency of a blood request.
+    
+    Uses LLM if configured (GEMINI_API_KEY or OPENAI_API_KEY),
+    otherwise falls back to rule-based assessment.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Perform urgency triage assessment."""
+        serializer = TriageRequestSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return error_response(
+                message="Invalid triage request",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validated = serializer.validated_data
+
+        # Initialise the triage service (with optional LLM)
+        llm = get_llm_provider()
+        service = TriageService(llm_provider=llm)
+
+        # Run assessment
+        result = service.assess({
+            "diagnosis": validated["diagnosis"],
+            "patient_age": validated.get("patient_age"),
+            "units_required": validated.get("units_required", 1),
+            "blood_group": validated["blood_group"],
+            "current_stock": validated.get("current_stock", 0),
+        })
+
+        # Persist triage log for audit trail
+        blood_request = None
+        blood_request_id = validated.get("blood_request_id")
+        if blood_request_id:
+            try:
+                blood_request = BloodRequest.objects.get(id=blood_request_id)
+            except BloodRequest.DoesNotExist:
+                pass  # non-critical — log without link
+
+        triage_log = TriageLog.objects.create(
+            blood_request=blood_request,
+            diagnosis=validated["diagnosis"],
+            patient_age=validated.get("patient_age"),
+            units_required=validated.get("units_required", 1),
+            blood_group=validated["blood_group"],
+            current_stock=validated.get("current_stock", 0),
+            urgency_level=result["urgency_level"],
+            confidence=result["confidence"],
+            reasoning=result["reasoning"],
+            auto_escalate=result["auto_escalate"],
+            recommended_actions=result["recommended_actions"],
+            method=result["method"],
+            assessed_by=request.user,
+        )
+
+        # If auto_escalate and there is a linked blood request, update its urgency
+        if result["auto_escalate"] and blood_request:
+            if blood_request.urgency_level != "emergency":
+                blood_request.urgency_level = "emergency"
+                blood_request.save(update_fields=["urgency_level"])
+                logger.info(
+                    "Auto-escalated blood request %s to EMERGENCY",
+                    blood_request.id,
+                )
+
+        # Build response
+        response_data = {
+            **result,
+            "triage_log_id": str(triage_log.id),
+        }
+
+        return created_response(
+            data=response_data,
+            message=f"Triage assessment: {result['urgency_level'].upper()}"
+        )
+
+
+class TriageLogListView(APIView):
+    """
+    GET /api/ai/triage/logs/
+    List triage assessment history (Admin only).
+    """
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        """Retrieve triage log history."""
+        queryset = TriageLog.objects.select_related(
+            'blood_request', 'assessed_by', 'overridden_by'
+        )
+
+        # Filters
+        urgency = request.query_params.get('urgency')
+        method = request.query_params.get('method')
+        blood_group = request.query_params.get('blood_group')
+
+        if urgency:
+            queryset = queryset.filter(urgency_level=urgency)
+        if method:
+            queryset = queryset.filter(method=method)
+        if blood_group:
+            queryset = queryset.filter(blood_group=blood_group)
+
+        queryset = queryset.order_by('-created_at')[:100]
+        serializer = TriageLogSerializer(queryset, many=True)
+
+        return success_response(
+            data={
+                'triage_logs': serializer.data,
+                'count': len(serializer.data),
+            },
+            message="Triage logs retrieved"
+        )
+
+
+class TriageOverrideView(APIView):
+    """
+    POST /api/ai/triage/<triage_id>/override/
+    Admin override for a triage assessment.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, triage_id):
+        """Override a triage assessment's urgency level."""
+        try:
+            triage_log = TriageLog.objects.get(id=triage_id)
+        except TriageLog.DoesNotExist:
+            return error_response(
+                message="Triage log not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = TriageOverrideSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                message="Invalid override data",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        triage_log.admin_override_level = serializer.validated_data['urgency_level']
+        triage_log.override_reason = serializer.validated_data['reason']
+        triage_log.overridden_by = request.user
+        triage_log.save(update_fields=[
+            'admin_override_level', 'override_reason', 'overridden_by',
+        ])
+
+        # If the override escalates to emergency and there's a linked request, update it
+        if (serializer.validated_data['urgency_level'] == 'emergency'
+                and triage_log.blood_request):
+            triage_log.blood_request.urgency_level = 'emergency'
+            triage_log.blood_request.save(update_fields=['urgency_level'])
+
+        return success_response(
+            data=TriageLogSerializer(triage_log).data,
+            message=f"Triage overridden to {serializer.validated_data['urgency_level'].upper()}"
         )

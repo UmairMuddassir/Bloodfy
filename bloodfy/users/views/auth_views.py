@@ -72,7 +72,6 @@ class RegisterView(generics.CreateAPIView):
                     'refresh': str(refresh),
                     'access': str(refresh.access_token),
                 },
-                'otp': otp  # Remove in production
             },
             message="Registration successful. Please verify your email."
         )
@@ -197,7 +196,6 @@ class ResendOTPView(APIView):
         # TODO: Send OTP via email
         
         return success_response(
-            data={'otp': otp},  # Remove in production
             message="OTP sent successfully"
         )
 
