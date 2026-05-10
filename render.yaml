@@ -1,13 +1,13 @@
-# Free Tier Configuration (No Redis/Worker to avoid costs)
+# Free Tier Configuration
 databases:
   - name: bloodify-db
     plan: free
 
 services:
-  # Only the Web Service is available on the Free tier
   - type: web
     name: bloodify-api
     runtime: python
+    plan: free # Explicitly set free plan to avoid $7/mo charge
     buildCommand: ./build.sh
     startCommand: gunicorn bloodfy_project.wsgi:application
     rootDir: bloodfy
