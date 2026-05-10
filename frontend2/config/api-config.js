@@ -9,6 +9,7 @@
 // API Configuration
 // =============================================================================
 
+const API_CONFIG = {
     // Dynamic Base URL detection
     BASE_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://127.0.0.1:8000/api'
