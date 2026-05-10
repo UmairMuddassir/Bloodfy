@@ -9,9 +9,10 @@
 // API Configuration
 // =============================================================================
 
-const API_CONFIG = {
-    // Base URL for the backend API (Local for Demo)
-    BASE_URL: 'http://127.0.0.1:8000/api',
+    // Dynamic Base URL detection
+    BASE_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://127.0.0.1:8000/api'
+        : 'https://bloodify-api.onrender.com/api',
 
     // Request timeout in milliseconds
     TIMEOUT: 30000,
