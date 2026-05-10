@@ -1,2 +1,1 @@
-web: gunicorn bloodfy_project.wsgi --log-file -
-release: python manage.py migrate
+web: python3 manage.py migrate && gunicorn bloodfy_project.wsgi:application
