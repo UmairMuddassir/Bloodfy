@@ -1,5 +1,15 @@
+# 1. Resources First
+databases:
+  - name: bloodify-db
+    plan: free
+
 services:
-  # 1. Django Web Service (API)
+  - type: redis
+    name: bloodify-redis
+    plan: free
+    ipAllowList: []
+
+  # 2. Django Web Service
   - type: web
     name: bloodify-api
     runtime: python
@@ -23,7 +33,7 @@ services:
       - key: ALLOWED_HOSTS
         value: "*"
 
-  # 2. Celery Background Worker
+  # 3. Celery Worker
   - type: worker
     name: bloodify-worker
     runtime: python
@@ -41,19 +51,4 @@ services:
           name: bloodify-redis
           property: connectionString
       - key: SECRET_KEY
-        fromService:
-          type: web
-          name: bloodify-api
-          property: envVar
-          envVarKey: SECRET_KEY
-
-  # 3. Redis for Celery Broker
-  - type: redis
-    name: bloodify-redis
-    plan: free
-    ipAllowList: []
-
-# 4. Managed PostgreSQL Database
-databases:
-  - name: bloodify-db
-    plan: free
+        generateValue: true
