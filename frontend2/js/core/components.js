@@ -114,6 +114,31 @@
     }
 
     /**
+     * Setup mobile menu toggle
+     */
+    function setupMobileMenu() {
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+
+        if (!menuToggle || !sidebar) return;
+
+        menuToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sidebar.classList.toggle('sidebar--active');
+        });
+
+        // Close sidebar when clicking on main content
+        if (mainContent) {
+            mainContent.addEventListener('click', () => {
+                if (sidebar.classList.contains('sidebar--active')) {
+                    sidebar.classList.remove('sidebar--active');
+                }
+            });
+        }
+    }
+
+    /**
      * Setup user dropdown menu
      */
     function setupUserDropdown() {
@@ -189,6 +214,7 @@
             updateUserInfo();
             setupUserDropdown();
             setupLogout(); // Also handles header logout if header loaded later
+            setupMobileMenu(); // Setup mobile menu after header is loaded
         }
     }
 
