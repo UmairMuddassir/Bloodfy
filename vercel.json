@@ -1,1 +1,6 @@
-{}
+{
+  "rewrites": [
+    { "source": "/", "destination": "/frontend2/auth/user-login.html" },
+    { "source": "/(.*)", "destination": "/frontend2/$1" }
+  ]
+}
