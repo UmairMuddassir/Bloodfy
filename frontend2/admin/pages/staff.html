@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../../css/responsive-fix.css">
 
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -375,7 +376,19 @@
     </aside>
 
     <div class="main-content">
-        <div class="page-header">
+        <header class="header" style="display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="mobileMenuBtn" style="display: none; background: transparent; border: 1px solid var(--border-color); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer;">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h2 style="font-weight: 600; font-size: 1.5rem;">Admin & Staff</h2>
+            </div>
+            <div class="header-actions" style="display: flex; align-items: center; gap: 20px;">
+                 <button id="btnAddUserTop" class="btn-add" style="margin-bottom: 0;"><i class="fa-solid fa-plus"></i> Add User</button>
+            </div>
+        </header>
+
+        <div class="page-header" style="display: none;">
             <h2>Admin & Staff Management</h2>
             <button id="btnAddUser" class="btn-add"><i class="fa-solid fa-plus"></i> Add New User</button>
         </div>

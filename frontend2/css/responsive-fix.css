@@ -1,0 +1,83 @@
+/* Global Responsive Fixes for Bloodify */
+
+/* Handle Sidebar on Mobile */
+@media (max-width: 1024px) {
+    .sidebar {
+        position: fixed !important;
+        left: -260px !important;
+        z-index: 1000 !important;
+        height: 100vh !important;
+        transition: left 0.3s ease !important;
+        box-shadow: 10px 0 30px rgba(0,0,0,0.5) !important;
+    }
+
+    .sidebar.active {
+        left: 0 !important;
+    }
+
+    .main-content {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    .header {
+        padding: 15px 20px !important;
+    }
+
+    .header-actions {
+        gap: 10px !important;
+    }
+
+    .search-bar {
+        display: none !important;
+    }
+
+    #mobileMenuBtn {
+        display: block !important;
+    }
+}
+
+/* Handle Grids and Layouts on Mobile */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .data-widgets {
+        grid-template-columns: 1fr !important;
+    }
+
+    .card-ai {
+        grid-column: 1 !important;
+        grid-row: auto !important;
+    }
+
+    .dashboard-main {
+        padding: 15px !important;
+    }
+
+    .header h2 {
+        font-size: 1rem !important;
+    }
+
+    /* Table Responsiveness */
+    .table-container, .widget, .table-wrap {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        min-width: 600px; /* Force scroll on very small screens */
+    }
+
+    /* Form Layouts */
+    .form-grid, .grid-cols-2, .grid-cols-3 {
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-content {
+        width: 95% !important;
+        margin: 10px !important;
+        padding: 15px !important;
+    }
+}

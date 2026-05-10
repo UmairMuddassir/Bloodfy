@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../../css/responsive-fix.css">
 
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -354,7 +355,12 @@
 
     <div class="main-content">
         <header class="header">
-            <h2>Donor Management</h2>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="mobileMenuBtn" style="display: none; background: transparent; border: 1px solid var(--glass-border); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer;">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h2>Donor Management</h2>
+            </div>
             <div class="header-actions">
                 <div class="search-bar">
                     <input type="text" id="donorSearch" placeholder="Search donors by name, city, blood group...">
