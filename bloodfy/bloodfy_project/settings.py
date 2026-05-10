@@ -190,6 +190,10 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://bloodfyfrontend.vercel.app',
+    'https://bloodify-api-gin9.onrender.com'
+]
 
 CORS_ALLOW_METHODS = [
     'DELETE',
