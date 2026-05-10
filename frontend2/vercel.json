@@ -1,5 +1,7 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/auth/user-login.html" }
+    { "source": "/", "destination": "/auth/user-login.html" },
+    { "source": "/admin-login.html", "destination": "/auth/admin-login.html" },
+    { "source": "/user-login.html", "destination": "/auth/user-login.html" }
   ]
 }
