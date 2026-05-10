@@ -5,7 +5,7 @@ services:
     runtime: python
     buildCommand: ./build.sh
     startCommand: gunicorn bloodfy_project.wsgi:application
-    rootDirectory: bloodfy
+    rootDir: bloodfy
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -21,7 +21,7 @@ services:
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
-        value: "*" # You can restrict this later
+        value: "*"
 
   # 2. Celery Background Worker
   - type: worker
@@ -29,7 +29,7 @@ services:
     runtime: python
     buildCommand: ./build.sh
     startCommand: celery -A bloodfy_project worker --loglevel=info
-    rootDirectory: bloodfy
+    rootDir: bloodfy
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -47,13 +47,13 @@ services:
           property: envVar
           envVarKey: SECRET_KEY
 
-# 3. Managed PostgreSQL Database
-database:
-  name: bloodify-db
-  plan: free
+  # 3. Redis for Celery Broker
+  - type: redis
+    name: bloodify-redis
+    plan: free
+    ipAllowList: []
 
-# 4. Redis for Celery Broker
-redis:
-  name: bloodify-redis
-  plan: free
-  ipAllowList: [] # Only allow internal connections
+# 4. Managed PostgreSQL Database
+databases:
+  - name: bloodify-db
+    plan: free
