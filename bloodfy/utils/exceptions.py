@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.conf import settings
 from rest_framework.exceptions import ValidationError as DRFValidationError
 import logging
 
@@ -53,7 +54,7 @@ def custom_exception_handler(exc, context):
         return Response({
             'success': False,
             'message': 'An unexpected error occurred. Please try again later.',
-            'errors': {'detail': str(exc) if hasattr(exc, '__str__') else 'Unknown error'},
+            'errors': {'detail': str(exc) if settings.DEBUG else 'Internal server error'},
             'status_code': status.HTTP_500_INTERNAL_SERVER_ERROR,
             'timestamp': timezone.now().isoformat(),
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

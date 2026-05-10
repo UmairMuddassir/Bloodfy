@@ -12,6 +12,9 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
         :root {
             --primary-red: #c62828;
@@ -152,9 +155,9 @@
             min-height: 400px;
         }
 
-        .table-header {
+        .grid-table-header {
             display: grid;
-            grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr;
+            grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr 2.5fr;
             padding: 20px;
             color: var(--text-secondary);
             font-weight: 600;
@@ -168,16 +171,16 @@
             min-height: 200px;
         }
 
-        .request-row {
+        .grid-request-row {
             display: grid;
-            grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr;
+            grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr 2.5fr;
             padding: 20px;
             border-bottom: 1px solid var(--glass-border);
             align-items: center;
             transition: background 0.2s;
         }
 
-        .request-row:hover {
+        .grid-request-row:hover {
             background: rgba(255, 255, 255, 0.03);
         }
 
@@ -204,15 +207,29 @@
             color: #00C853;
         }
 
+        .table-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-start;
+        }
+
         .btn-table {
             background: rgba(255, 255, 255, 0.1);
             color: white;
-            border: none;
-            padding: 8px 16px;
+            border: 1px solid var(--glass-border);
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            font-weight: 500;
             cursor: pointer;
-            margin-right: 5px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .btn-table:hover {
+            background: var(--primary-red);
+            border-color: var(--primary-red);
         }
 
         .admin-profile {
@@ -285,9 +302,10 @@
             </div>
 
             <div class="widget">
-                <div class="table-header">
+                <div class="grid-table-header">
                     <div>Patient / Reason</div>
                     <div>Blood Group</div>
+                    <div>Units</div>
                     <div>Hospital</div>
                     <div>Status</div>
                     <div>Actions</div>

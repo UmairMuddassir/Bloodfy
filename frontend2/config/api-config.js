@@ -59,8 +59,13 @@ const API_ENDPOINTS = {
         ASSIGN: (requestId) => `/blood-requests/${requestId}/assign/`,
         COMPLETE: (requestId) => `/blood-requests/${requestId}/complete/`,
         MATCHED_DONORS: (requestId) => `/blood-requests/${requestId}/matched-donors/`,
-        EMERGENCY_SEARCH: '/blood-requests/emergency-search/',
         DONOR_RESPONSES: '/blood-requests/responses/',
+    },
+
+    // Emergency (correct backend URL)
+    EMERGENCY: {
+        SEARCH: '/donors/emergency/search/',
+        CONTACT: '/donors/emergency/contact/',
     },
 
     // Blood Stock
@@ -461,6 +466,28 @@ const API = {
             return await apiRequest(API_ENDPOINTS.NOTIFICATIONS.APP_MARK_READ(notificationId), {
                 method: 'POST'
             });
+        },
+        async sendBulk(data) {
+            return await apiRequest(API_ENDPOINTS.NOTIFICATIONS.SEND_BULK, {
+                method: 'POST',
+                body: data
+            });
+        }
+    },
+
+    // Emergency Donor Search
+    emergency: {
+        async search(blood_group, location, latitude = null, longitude = null) {
+            const params = new URLSearchParams({ blood_group, location });
+            if (latitude) params.append('latitude', latitude);
+            if (longitude) params.append('longitude', longitude);
+            return await apiRequest(`${API_ENDPOINTS.EMERGENCY.SEARCH}?${params.toString()}`);
+        },
+        async contact(donor_id, contact_type = 'SMS') {
+            return await apiRequest(API_ENDPOINTS.EMERGENCY.CONTACT, {
+                method: 'POST',
+                body: { donor_id, contact_type }
+            });
         }
     },
 
@@ -478,17 +505,20 @@ const API = {
         },
     },
 
-    // Chatbot
+    // Chatbot (public — no auth required)
     chatbot: {
         async sendQuery(query) {
             return await apiRequest(API_ENDPOINTS.CHATBOT.QUERY, {
                 method: 'POST',
-                body: { query },
+                body: { message: query },
+                requiresAuth: false,
             });
         },
 
         async getFAQs() {
-            return await apiRequest(API_ENDPOINTS.CHATBOT.FAQS);
+            return await apiRequest(API_ENDPOINTS.CHATBOT.FAQS, {
+                requiresAuth: false,
+            });
         },
     },
 

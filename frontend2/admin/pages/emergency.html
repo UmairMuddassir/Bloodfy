@@ -12,6 +12,13 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet.js (FREE, no API key needed) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         :root {
             --primary-red: #E53935;
@@ -147,14 +154,14 @@
             position: relative;
             width: 100%;
             height: 60vh;
-            /* Takes up top half */
             background-color: #242f3e;
-            /* Dark map fallback */
-            background-image: url('https://upload.wikimedia.org/wikipedia/commons/e/ec/World_map_blank_without_borders.svg');
-            /* Placeholder Map Image */
-            background-size: cover;
-            background-position: center;
             overflow: hidden;
+        }
+
+        #leafletMap {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
         }
 
         /* Dark Overlay on Map for "Tech" feel */
@@ -181,7 +188,7 @@
             border-radius: 16px;
             padding: 25px;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
-            z-index: 10;
+            z-index: 1000;
         }
 
         .search-panel h2 {
@@ -398,7 +405,7 @@
     <div class="main-content">
 
         <div class="map-wrapper">
-            <div class="map-overlay"></div>
+            <div id="leafletMap"></div>
 
             <div class="search-panel">
                 <h2><i class="fa-solid fa-bolt"></i> Quick Find</h2>
@@ -408,62 +415,29 @@
                         <select class="custom-select" id="emergencyBloodGroup">
                             <option value="O-">O Negative (O-)</option>
                             <option value="A+">A Positive (A+)</option>
+                            <option value="A-">A Negative (A-)</option>
+                            <option value="B+">B Positive (B+)</option>
                             <option value="B-">B Negative (B-)</option>
                             <option value="AB+">AB Positive (AB+)</option>
                             <option value="AB-">AB Negative (AB-)</option>
+                            <option value="O+">O Positive (O+)</option>
                         </select>
                     </div>
                     <div class="input-group">
                         <label>Location / City</label>
                         <input type="text" id="emergencyLocation" class="custom-input"
-                            placeholder="Enter area or hospital..." value="Lahore">
+                            placeholder="Enter city or hospital..." value="Lahore">
                     </div>
                     <button type="submit" id="btnSearchEmergency" class="btn-emergency">Search Donors</button>
                 </form>
-            </div>
-
-            <div class="map-marker" style="top: 40%; left: 55%;" title="Bilal (O-)"><i class="fa-solid fa-user"></i>
-            </div>
-            <div class="map-marker" style="top: 50%; left: 60%;" title="Ali (O-)"><i class="fa-solid fa-user"></i></div>
-            <div class="map-marker" style="top: 35%; left: 45%;" title="Hospital"><i class="fa-solid fa-hospital"></i>
             </div>
         </div>
 
         <div class="results-section">
             <div class="results-header">
                 <h3>Nearest Active Donors (Sorted by Distance)</h3>
-                <span style="color: var(--text-secondary);">3 Matches Found for <strong>O-</strong> in
-                    <strong>Lahore</strong></span>
+                <span style="color: var(--text-secondary);">Search for donors to see results</span>
             </div>
-
-            <div class="donor-result-card">
-                <div class="donor-info">
-                    <div class="donor-avatar">BA</div>
-                    <div>
-                        <h4 style="font-size: 1.1rem;">Bilal Ahmad</h4>
-                        <span class="dist-badge"><i class="fa-solid fa-route"></i> 2.5 km away</span>
-                    </div>
-                </div>
-                <div class="action-btns">
-                    <button class="btn-icon btn-sms" title="Send SMS"><i class="fa-solid fa-comment-sms"></i></button>
-                    <button class="btn-icon btn-call" title="Call Now"><i class="fa-solid fa-phone"></i></button>
-                </div>
-            </div>
-
-            <div class="donor-result-card">
-                <div class="donor-info">
-                    <div class="donor-avatar">MK</div>
-                    <div>
-                        <h4 style="font-size: 1.1rem;">M. Khan</h4>
-                        <span class="dist-badge"><i class="fa-solid fa-route"></i> 4.1 km away</span>
-                    </div>
-                </div>
-                <div class="action-btns">
-                    <button class="btn-icon btn-sms"><i class="fa-solid fa-comment-sms"></i></button>
-                    <button class="btn-icon btn-call"><i class="fa-solid fa-phone"></i></button>
-                </div>
-            </div>
-
         </div>
     </div>
 
@@ -475,6 +449,141 @@
 
     <!-- Emergency Search Script -->
     <script src="../../js/emergency.js"></script>
+
+    <!-- Leaflet Map Init -->
+    <script>
+        // Pakistani city center coordinates
+        const CITY_COORDS = {
+            'lahore':     [31.5204, 74.3587],
+            'karachi':    [24.8607, 67.0011],
+            'islamabad':  [33.6844, 73.0479],
+            'rawalpindi': [33.5651, 73.0169],
+            'faisalabad': [31.4504, 73.1350],
+            'multan':     [30.1978, 71.4711],
+            'peshawar':   [34.0151, 71.5249],
+            'quetta':     [30.1798, 66.9750],
+            'default':    [31.5204, 74.3587]
+        };
+
+        let map = null;
+        let donorMarkers = [];
+        let hospitalMarker = null;
+
+        // Custom icons
+        const hospitalIcon = L.divIcon({
+            html: '<div style="background:#E53935;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 0 15px rgba(229,57,53,0.7);animation:pulse 2s infinite;"><i class="fa-solid fa-hospital" style="color:white;font-size:16px;"></i></div>',
+            className: '',
+            iconSize: [38, 38],
+            iconAnchor: [19, 19]
+        });
+
+        function getDonorIcon(rank) {
+            const colors = ['#00C853','#4CAF50','#8BC34A','#CDDC39','#FFC107','#FF9800','#FF5722'];
+            const color = colors[Math.min(rank - 1, colors.length - 1)];
+            return L.divIcon({
+                html: `<div style="background:${color};border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 0 10px ${color}80;font-weight:700;color:white;font-size:13px;">${rank}</div>`,
+                className: '',
+                iconSize: [34, 34],
+                iconAnchor: [17, 17]
+            });
+        }
+
+        function initLeafletMap(city) {
+            const cityKey = (city || 'lahore').toLowerCase();
+            const center = CITY_COORDS[cityKey] || CITY_COORDS['default'];
+
+            if (!map) {
+                map = L.map('leafletMap', {
+                    center: center,
+                    zoom: 13,
+                    zoomControl: true
+                });
+
+                // Dark tile layer (free)
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+                    subdomains: 'abcd',
+                    maxZoom: 19
+                }).addTo(map);
+            } else {
+                map.setView(center, 13);
+            }
+
+            // Place hospital marker at city center
+            if (hospitalMarker) hospitalMarker.remove();
+            hospitalMarker = L.marker(center, { icon: hospitalIcon })
+                .addTo(map)
+                .bindPopup('<b style="color:#E53935;">📍 Hospital / Request Location</b>')
+                .openPopup();
+
+            return center;
+        }
+
+        function plotDonorsOnMap(donors, hospitalCenter) {
+            // Remove old markers
+            donorMarkers.forEach(m => m.remove());
+            donorMarkers = [];
+
+            donors.forEach((donor, index) => {
+                const rank = index + 1;
+                let lat, lon;
+
+                if (donor.latitude && donor.longitude) {
+                    lat = donor.latitude;
+                    lon = donor.longitude;
+                } else {
+                    // Scatter around city center if no coords
+                    const angle = (index / donors.length) * 2 * Math.PI;
+                    const spread = 0.02 + (index * 0.008);
+                    lat = hospitalCenter[0] + spread * Math.sin(angle);
+                    lon = hospitalCenter[1] + spread * Math.cos(angle);
+                }
+
+                const distText = donor.distance ? `${donor.distance} km away` : `~${(1 + index * 0.5).toFixed(1)} km (est.)`;
+                const etaText = donor.eta_minutes ? `~${donor.eta_minutes} min ETA` : `~${5 + index * 3} min ETA`;
+
+                const marker = L.marker([lat, lon], { icon: getDonorIcon(rank) })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="font-family:Poppins,sans-serif;min-width:180px;">
+                            <b style="color:#E53935;font-size:1rem;">#${rank} ${donor.name}</b><br>
+                            <span style="color:#888;">🩸 ${donor.blood_group}</span><br>
+                            <span style="color:#2962FF;">📍 ${distText}</span><br>
+                            <span style="color:#00C853;">⏱ ${etaText}</span>
+                        </div>
+                    `);
+
+                // Draw line from hospital to donor
+                L.polyline([hospitalCenter, [lat, lon]], {
+                    color: rank === 1 ? '#00C853' : '#555',
+                    weight: rank === 1 ? 2.5 : 1.5,
+                    dashArray: rank === 1 ? null : '5,8',
+                    opacity: 0.7
+                }).addTo(map);
+
+                donorMarkers.push(marker);
+            });
+
+            // Fit map to show all markers
+            if (donorMarkers.length > 0) {
+                const allPoints = [[hospitalCenter[0], hospitalCenter[1]], ...donors.map((d, i) => {
+                    const m = donorMarkers[i];
+                    const latlng = m.getLatLng();
+                    return [latlng.lat, latlng.lng];
+                })];
+                map.fitBounds(allPoints, { padding: [40, 40] });
+            }
+        }
+
+        // Make available globally for emergency.js
+        window.initLeafletMap = initLeafletMap;
+        window.plotDonorsOnMap = plotDonorsOnMap;
+
+        // Initialize map on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initLeafletMap('lahore');
+        });
+    </script>
 
 </body>
 

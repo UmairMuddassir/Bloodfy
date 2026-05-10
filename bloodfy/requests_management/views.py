@@ -223,7 +223,7 @@ class BloodRequestDetailView(APIView):
 
 
 class BloodRequestCompleteView(APIView):
-    """Mark blood request as completed (Recipient/Owner only)."""
+    """Mark blood request as completed and record donation."""
     
     permission_classes = [IsAuthenticated]
     
@@ -251,11 +251,51 @@ class BloodRequestCompleteView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         
-        blood_request.mark_as_completed()
+        message = "Blood request marked as completed successfully"
+        
+        # AUTOMATIC COOLDOWN & PARTIAL FULFILLMENT LOGIC
+        if blood_request.assigned_donor:
+            try:
+                from donors.models import DonationHistory
+                
+                # 1 Donor gives 1 Unit
+                DonationHistory.objects.create(
+                    donor=blood_request.assigned_donor,
+                    blood_group=blood_request.assigned_donor.blood_group,
+                    units_donated=1,
+                    donation_date=timezone.now().date(),
+                    hospital_name=blood_request.hospital_name,
+                    notes=f"Automatically recorded for completed request #{str(blood_request.id)[:8]}"
+                )
+                
+                # Update the donor's last donation date (this triggers the cooldown in the donor model)
+                blood_request.assigned_donor.record_donation(timezone.now().date())
+                
+                # Increment the fulfilled units
+                blood_request.units_fulfilled += 1
+                
+                if blood_request.units_fulfilled >= blood_request.units_required:
+                    # Fully completed
+                    blood_request.mark_as_completed()
+                    message = "Request fully completed and donor placed on cooldown."
+                else:
+                    # Partially completed! Needs more donors.
+                    # Unassign the current donor so another one can be assigned.
+                    blood_request.status = 'approved'
+                    blood_request.assigned_donor = None
+                    blood_request.save(update_fields=['status', 'assigned_donor', 'units_fulfilled'])
+                    remaining = blood_request.units_required - blood_request.units_fulfilled
+                    message = f"1 unit fulfilled. {remaining} more unit(s) needed. Please assign another donor."
+                    
+            except Exception as e:
+                print(f"Error putting donor on cooldown: {e}")
+                blood_request.mark_as_completed()
+        else:
+            blood_request.mark_as_completed()
         
         return success_response(
             data=BloodRequestSerializer(blood_request, context={'request': request}).data,
-            message="Blood request marked as completed successfully"
+            message=message
         )
 
 

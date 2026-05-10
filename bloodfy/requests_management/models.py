@@ -239,44 +239,37 @@ class BloodRequest(models.Model):
 
     def find_matches(self):
         """Find and link eligible donors to this request using AI logic."""
-        from utils.constants import BLOOD_COMPATIBILITY
+        from ai_engine.ranking_engine import process_blood_request
         
-        # Get compatible groups for the requested blood type
-        compatible_groups = BLOOD_COMPATIBILITY.get(self.blood_group, [self.blood_group])
-        
-        # CRITICAL: Only match DONOR_APPROVED donors
-        # Find donors with compatible blood group and matching city
-        potential_donors = Donor.objects.filter(
-            blood_group__in=compatible_groups,
-            city__icontains=self.hospital_city, 
-            is_active=True,
-            is_eligible=True,
-            availability_status=True,
-            user__donor_status='DONOR_APPROVED'  # CRITICAL: Only approved donors
-        ).exclude(user=self.recipient.user).order_by('-response_rate')
-        
-        # Limit to top 15 most reliable matches to avoid over-notifying
-        matches_found = 0
-        for donor in potential_donors[:15]:
-            # Add to many-to-many relationship
-            self.ai_matched_donors.add(donor)
+        # Trigger the actual AI Ranking Engine
+        # This will calculate scores and save AIRanking logs to the database!
+        try:
+            rankings, donors = process_blood_request(self, max_donors=15, max_distance_km=100)
             
-            # Create response record so they see it in their dashboard
-            DonorResponse.objects.get_or_create(
-                blood_request=self,
-                donor=donor,
-                defaults={'response_status': 'pending'}
-            )
+            matches_found = 0
+            for ranked_donor in donors:
+                # Add to many-to-many relationship
+                self.ai_matched_donors.add(ranked_donor)
+                
+                # Create response record so they see it in their dashboard
+                DonorResponse.objects.get_or_create(
+                    blood_request=self,
+                    donor=ranked_donor,
+                    defaults={'response_status': 'pending'}
+                )
+                
+                # Update donor metrics
+                ranked_donor.total_requests_received += 1
+                ranked_donor.save(update_fields=['total_requests_received'])
+                matches_found += 1
+                
+            if matches_found > 0:
+                self.mark_as_matched()
             
-            # Update donor metrics
-            donor.total_requests_received += 1
-            donor.save(update_fields=['total_requests_received'])
-            matches_found += 1
-            
-        if matches_found > 0:
-            self.mark_as_matched()
-        
-        return matches_found
+            return matches_found
+        except Exception as e:
+            print(f"Error in find_matches using AI ranking: {e}")
+            return 0
 
 
 class DonorResponse(models.Model):

@@ -10,11 +10,13 @@ from .views import (
     NotificationStatsView,
     NotificationTemplateListView,
     AppNotificationAPIView,
+    SendBulkNotificationView,
 )
 
 urlpatterns = [
     path('', NotificationListView.as_view(), name='notification-list'),
     path('send-manual/', SendManualNotificationView.as_view(), name='notification-send'),
+    path('send-bulk/', SendBulkNotificationView.as_view(), name='notification-send-bulk'),
     path('logs/', NotificationLogsView.as_view(), name='notification-logs'),
     path('stats/', NotificationStatsView.as_view(), name='notification-stats'),
     path('templates/', NotificationTemplateListView.as_view(), name='notification-templates'),

@@ -267,21 +267,28 @@ class AIMetricsView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
     
     def get(self, request):
-        """Get latest AI metrics."""
-        metrics = AIModelMetrics.objects.order_by('-date')
-        latest = metrics.first()
+        """Get real-time AI metrics calculated from actual usage."""
         
-        accuracy = float(latest.accuracy_rate) if latest else 0
+        total_rankings = AIRanking.objects.count()
+        total_triages = TriageLog.objects.count()
+        total_predictions = total_rankings + total_triages
         
-        serializer = AIModelMetricsSerializer(metrics[:30], many=True)
+        accuracy_ratio = 0.0
+        if total_predictions > 0:
+            # Count overrides in triage as 'inaccurate' AI predictions
+            overrides = TriageLog.objects.exclude(admin_override_level__isnull=True).exclude(admin_override_level='').count()
+            
+            # Calculate accuracy: (Total predictions - wrong predictions) / Total
+            successful_predictions = total_predictions - overrides
+            accuracy_ratio = float(successful_predictions) / float(total_predictions)
         
         return success_response(
             data={
-                'accuracy': accuracy,
-                'metrics': serializer.data,
-                'count': metrics.count()
+                'accuracy': accuracy_ratio,
+                'metrics': [],
+                'count': total_predictions
             },
-            message="AI metrics retrieved"
+            message="Real-time AI metrics retrieved"
         )
 
 

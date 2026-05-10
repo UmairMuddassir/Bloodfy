@@ -12,6 +12,13 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet.js (FREE, no API key needed) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         :root {
             --primary-red: #E53935;
@@ -147,14 +154,14 @@
             position: relative;
             width: 100%;
             height: 60vh;
-            /* Takes up top half */
             background-color: #242f3e;
-            /* Dark map fallback */
-            background-image: url('https://upload.wikimedia.org/wikipedia/commons/e/ec/World_map_blank_without_borders.svg');
-            /* Placeholder Map Image */
-            background-size: cover;
-            background-position: center;
             overflow: hidden;
+        }
+
+        #leafletMap {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
         }
 
         /* Dark Overlay on Map for "Tech" feel */
@@ -181,7 +188,7 @@
             border-radius: 16px;
             padding: 25px;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
-            z-index: 10;
+            z-index: 1000;
         }
 
         .search-panel h2 {
@@ -394,7 +401,7 @@
     <div class="main-content">
 
         <div class="map-wrapper">
-            <div class="map-overlay"></div>
+            <div id="leafletMap"></div>
 
             <div class="search-panel">
                 <h2><i class="fa-solid fa-bolt"></i> Quick Find</h2>
@@ -443,6 +450,73 @@
 
     <!-- Emergency Search Script -->
     <script src="../../js/emergency.js"></script>
+
+    <!-- Leaflet Map Init -->
+    <script>
+        const CITY_COORDS = {
+            'lahore':     [31.5204, 74.3587],
+            'karachi':    [24.8607, 67.0011],
+            'islamabad':  [33.6844, 73.0479],
+            'rawalpindi': [33.5651, 73.0169],
+            'faisalabad': [31.4504, 73.1350],
+            'multan':     [30.1978, 71.4711],
+            'peshawar':   [34.0151, 71.5249],
+            'quetta':     [30.1798, 66.9750],
+            'default':    [31.5204, 74.3587]
+        };
+        let map = null, donorMarkers = [], hospitalMarker = null;
+
+        const hospitalIcon = L.divIcon({
+            html: '<div style="background:#E53935;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 0 15px rgba(229,57,53,0.7);"><i class="fa-solid fa-hospital" style="color:white;font-size:16px;"></i></div>',
+            className: '', iconSize: [38, 38], iconAnchor: [19, 19]
+        });
+
+        function getDonorIcon(rank) {
+            const colors = ['#00C853','#4CAF50','#8BC34A','#FFC107','#FF9800','#FF5722'];
+            const color = colors[Math.min(rank - 1, colors.length - 1)];
+            return L.divIcon({
+                html: `<div style="background:${color};border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:2px solid white;font-weight:700;color:white;font-size:13px;">${rank}</div>`,
+                className: '', iconSize: [34, 34], iconAnchor: [17, 17]
+            });
+        }
+
+        function initLeafletMap(city) {
+            const center = CITY_COORDS[(city||'lahore').toLowerCase()] || CITY_COORDS['default'];
+            if (!map) {
+                map = L.map('leafletMap', { center, zoom: 13 });
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; CARTO', subdomains: 'abcd', maxZoom: 19
+                }).addTo(map);
+            } else { map.setView(center, 13); }
+            if (hospitalMarker) hospitalMarker.remove();
+            hospitalMarker = L.marker(center, { icon: hospitalIcon }).addTo(map)
+                .bindPopup('<b style="color:#E53935;">📍 Your Location / Hospital</b>').openPopup();
+            return center;
+        }
+
+        function plotDonorsOnMap(donors, hospitalCenter) {
+            donorMarkers.forEach(m => m.remove()); donorMarkers = [];
+            donors.forEach((donor, index) => {
+                const rank = index + 1;
+                let lat = donor.latitude || (hospitalCenter[0] + (0.02 + index*0.008) * Math.sin(index * 1.2));
+                let lon = donor.longitude || (hospitalCenter[1] + (0.02 + index*0.008) * Math.cos(index * 1.2));
+                const distText = donor.distance ? `${donor.distance} km` : '~nearby';
+                const etaText = donor.eta_minutes ? `~${donor.eta_minutes} min` : '';
+                const marker = L.marker([lat, lon], { icon: getDonorIcon(rank) }).addTo(map)
+                    .bindPopup(`<div style="font-family:Poppins,sans-serif;"><b style="color:#E53935;">#${rank} ${donor.name}</b><br>🩸 ${donor.blood_group}<br>📍 ${distText}${etaText ? '<br>⏱ ' + etaText : ''}</div>`);
+                L.polyline([hospitalCenter, [lat, lon]], { color: rank===1?'#00C853':'#555', weight: rank===1?2.5:1.5, dashArray: rank===1?null:'5,8', opacity:0.7 }).addTo(map);
+                donorMarkers.push(marker);
+            });
+            if (donorMarkers.length > 0) {
+                const pts = [[hospitalCenter[0], hospitalCenter[1]], ...donorMarkers.map(m => [m.getLatLng().lat, m.getLatLng().lng])];
+                map.fitBounds(pts, { padding: [40, 40] });
+            }
+        }
+
+        window.initLeafletMap = initLeafletMap;
+        window.plotDonorsOnMap = plotDonorsOnMap;
+        document.addEventListener('DOMContentLoaded', () => initLeafletMap('lahore'));
+    </script>
 
 </body>
 

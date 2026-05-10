@@ -208,18 +208,26 @@ class DonorRequestListSerializer(serializers.ModelSerializer):
     """Serializer for listing donor requests (compact view)."""
     
     name = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField() # For cached JS compatibility
     email = serializers.EmailField(source='user.email', read_only=True)
     phone = serializers.CharField(source='user.phone_number', read_only=True)
+    user = serializers.SerializerMethodField() # For cached JS compatibility
     
     class Meta:
         model = DonorRequest
         fields = [
-            'id', 'name', 'email', 'phone', 'blood_group',
+            'id', 'name', 'user_name', 'email', 'phone', 'user', 'blood_group',
             'city', 'status', 'created_at'
         ]
     
     def get_name(self, obj):
         return obj.user.get_full_name()
+        
+    def get_user_name(self, obj):
+        return obj.user.get_full_name()
+        
+    def get_user(self, obj):
+        return {'email': obj.user.email}
 
 
 class DonorApprovalSerializer(serializers.Serializer):

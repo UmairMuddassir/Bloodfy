@@ -1,6 +1,6 @@
 /**
  * Analytics Page Integration Script
- * Display statistics and charts
+ * Fetches real data from the backend API and populates the analytics dashboard.
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -12,10 +12,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 // =============================================================================
 
 async function initializeAnalyticsPage() {
-    console.log('Initializing analytics page...');
-
-    // Load all statistics
-    await Promise.all([
+    // Load all statistics in parallel
+    await Promise.allSettled([
         loadDonorStats(),
         loadBloodStockStats(),
         loadAIMetrics(),
@@ -23,7 +21,7 @@ async function initializeAnalyticsPage() {
 }
 
 // =============================================================================
-// LOAD STATISTICS
+// LOAD DONOR STATISTICS
 // =============================================================================
 
 async function loadDonorStats() {
@@ -35,23 +33,53 @@ async function loadDonorStats() {
         }
     } catch (error) {
         console.error('Error loading donor stats:', error);
+        setFallbackDonorStats();
     }
 }
 
 function displayDonorStats(stats) {
-    // Update donor statistics elements
+    // Top stat cards
     const totalDonorsEl = document.getElementById('totalDonors');
     if (totalDonorsEl) totalDonorsEl.textContent = stats.total_donors || 0;
 
     const activeDonorsEl = document.getElementById('activeDonors');
-    if (activeDonorsEl) activeDonorsEl.textContent = stats.active_donors || 0;
+    if (activeDonorsEl) activeDonorsEl.textContent = stats.active_donors || stats.total_active_donors || 0;
 
-    const eligibleDonorsEl = document.getElementById('eligibleDonors');
-    if (eligibleDonorsEl) eligibleDonorsEl.textContent = stats.eligible_donors || 0;
+    // Donor info list
+    const infoTotalEl = document.getElementById('infoTotalDonors');
+    if (infoTotalEl) infoTotalEl.textContent = stats.total_donors || 0;
 
-    const totalDonationsEl = document.getElementById('totalDonations');
-    if (totalDonationsEl) totalDonationsEl.textContent = stats.total_donations || 0;
+    const infoActiveEl = document.getElementById('infoActiveDonors');
+    if (infoActiveEl) infoActiveEl.textContent = stats.active_donors || stats.total_active_donors || 0;
+
+    const infoEligibleEl = document.getElementById('infoEligibleDonors');
+    if (infoEligibleEl) infoEligibleEl.textContent = stats.eligible_donors || 0;
+
+    const infoResponseEl = document.getElementById('infoResponseRate');
+    if (infoResponseEl) {
+        const rate = stats.average_response_rate || 0;
+        infoResponseEl.textContent = rate > 0 ? rate + '%' : 'N/A';
+    }
+
+    // Eligible donors circle
+    const eligibleCircle = document.getElementById('eligibleDonorsCircle');
+    if (eligibleCircle) eligibleCircle.textContent = stats.eligible_donors || 0;
 }
+
+function setFallbackDonorStats() {
+    ['totalDonors', 'activeDonors', 'infoTotalDonors', 'infoActiveDonors', 'infoEligibleDonors'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '0';
+    });
+    const rateEl = document.getElementById('infoResponseRate');
+    if (rateEl) rateEl.textContent = 'N/A';
+    const eligCircle = document.getElementById('eligibleDonorsCircle');
+    if (eligCircle) eligCircle.textContent = '0';
+}
+
+// =============================================================================
+// LOAD BLOOD STOCK STATISTICS
+// =============================================================================
 
 async function loadBloodStockStats() {
     try {
@@ -62,25 +90,64 @@ async function loadBloodStockStats() {
         }
     } catch (error) {
         console.error('Error loading blood stock stats:', error);
+        setFallbackStockStats();
     }
 }
 
 function displayBloodStockStats(stats) {
-    // Update blood stock statistics
+    // Top stat cards
     const totalUnitsEl = document.getElementById('totalUnits');
-    if (totalUnitsEl) totalUnitsEl.textContent = stats.total_units || 0;
+    if (totalUnitsEl) totalUnitsEl.textContent = stats.total_units || stats.total_available || 0;
 
     const criticalStockEl = document.getElementById('criticalStock');
-    if (criticalStockEl) criticalStockEl.textContent = stats.critical_count || 0;
+    if (criticalStockEl) {
+        const criticalCount = stats.critical_stocks ? stats.critical_stocks.length : 0;
+        criticalStockEl.textContent = criticalCount;
+    }
 
-    const lowStockEl = document.getElementById('lowStock');
-    if (lowStockEl) lowStockEl.textContent = stats.low_count || 0;
+    // Stock info list
+    const infoAvailableEl = document.getElementById('infoTotalAvailable');
+    if (infoAvailableEl) infoAvailableEl.textContent = (stats.total_available || 0) + ' units';
 
-    // Display blood group distribution if available
+    const infoReservedEl = document.getElementById('infoReserved');
+    if (infoReservedEl) infoReservedEl.textContent = (stats.total_reserved || 0) + ' units';
+
+    const infoExpiredEl = document.getElementById('infoExpired');
+    if (infoExpiredEl) infoExpiredEl.textContent = (stats.total_expired || 0) + ' units';
+
+    const infoHealthEl = document.getElementById('infoInventoryHealth');
+    if (infoHealthEl) {
+        const pct = Math.round(stats.inventory_percentage || 0);
+        infoHealthEl.textContent = pct + '%';
+        if (pct >= 60) {
+            infoHealthEl.className = 'value good';
+        } else if (pct >= 30) {
+            infoHealthEl.className = 'value';
+        } else {
+            infoHealthEl.className = 'value critical';
+        }
+    }
+
+    // Display blood group distribution bar chart
     if (stats.by_blood_group) {
         displayBloodGroupChart(stats.by_blood_group);
     }
 }
+
+function setFallbackStockStats() {
+    ['totalUnits', 'criticalStock'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '0';
+    });
+    const chartEl = document.getElementById('bloodGroupChart');
+    if (chartEl) {
+        chartEl.innerHTML = '<div style="color: var(--text-secondary); text-align: center; width: 100%; padding: 60px 0;">No blood stock data available</div>';
+    }
+}
+
+// =============================================================================
+// LOAD AI METRICS
+// =============================================================================
 
 async function loadAIMetrics() {
     try {
@@ -91,54 +158,96 @@ async function loadAIMetrics() {
         }
     } catch (error) {
         console.error('Error loading AI metrics:', error);
+        setFallbackAIMetrics();
     }
 }
 
 function displayAIMetrics(metrics) {
-    // Update AI metrics
-    const accuracyEl = document.getElementById('aiAccuracy');
-    if (accuracyEl) accuracyEl.textContent = (metrics.accuracy || 0) + '%';
+    // AI Accuracy circle
+    const accuracyCircle = document.getElementById('aiAccuracyCircle');
+    if (accuracyCircle) {
+        const accuracy = metrics.accuracy || 0;
+        if (accuracy > 0) {
+            accuracyCircle.textContent = Math.round(accuracy * 100) + '%';
+        } else {
+            accuracyCircle.textContent = 'N/A';
+        }
+    }
 
-    const predictionsEl = document.getElementById('totalPredictions');
-    if (predictionsEl) predictionsEl.textContent = metrics.total_predictions || 0;
+    // Total predictions circle
+    const predictionsCircle = document.getElementById('totalPredictionsCircle');
+    if (predictionsCircle) {
+        const count = metrics.count || 0;
+        predictionsCircle.textContent = count > 0 ? count : '0';
+    }
+}
 
-    const successRateEl = document.getElementById('successRate');
-    if (successRateEl) successRateEl.textContent = (metrics.success_rate || 0) + '%';
+function setFallbackAIMetrics() {
+    const accCircle = document.getElementById('aiAccuracyCircle');
+    if (accCircle) accCircle.textContent = 'N/A';
+    const predCircle = document.getElementById('totalPredictionsCircle');
+    if (predCircle) predCircle.textContent = '0';
+    const eligCircle = document.getElementById('eligibleDonorsCircle');
+    if (eligCircle) eligCircle.textContent = '0';
 }
 
 // =============================================================================
-// CHARTS (Simple Text-Based for Now)
+// DYNAMIC BAR CHART
 // =============================================================================
 
 function displayBloodGroupChart(bloodGroupData) {
     const chartContainer = document.getElementById('bloodGroupChart');
-
     if (!chartContainer) return;
 
-    // Clear existing content
+    // Clear loading state
     chartContainer.innerHTML = '';
 
-    // Create simple bar chart using HTML/CSS
-    Object.entries(bloodGroupData).forEach(([bloodGroup, count]) => {
-        const barWrapper = document.createElement('div');
-        barWrapper.style.cssText = 'margin-bottom: 10px;';
+    const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+    
+    // Get the max units for scaling
+    let maxUnits = 0;
+    bloodGroups.forEach(bg => {
+        const data = bloodGroupData[bg];
+        const units = data ? (typeof data === 'object' ? data.units : data) : 0;
+        if (units > maxUnits) maxUnits = units;
+    });
+
+    // If max is 0, set to 1 to avoid division by zero
+    if (maxUnits === 0) maxUnits = 1;
+
+    // Create bars
+    bloodGroups.forEach(bg => {
+        const data = bloodGroupData[bg];
+        const units = data ? (typeof data === 'object' ? data.units : data) : 0;
+        const heightPct = Math.max(2, (units / maxUnits) * 100);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bar-wrapper';
+
+        const valueLabel = document.createElement('div');
+        valueLabel.className = 'bar-value';
+        valueLabel.textContent = units;
+
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = '0%';
+        bar.title = `${bg}: ${units} units`;
 
         const label = document.createElement('div');
-        label.textContent = `${bloodGroup}: ${count} units`;
-        label.style.cssText = 'font-size: 0.9rem; margin-bottom: 5px;';
+        label.className = 'bar-label';
+        label.textContent = bg;
 
-        const barOuter = document.createElement('div');
-        barOuter.style.cssText = 'width: 100%; height: 25px; background: rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden;';
+        wrapper.appendChild(valueLabel);
+        wrapper.appendChild(bar);
+        wrapper.appendChild(label);
+        chartContainer.appendChild(wrapper);
 
-        const barInner = document.createElement('div');
-        const maxCount = Math.max(...Object.values(bloodGroupData));
-        const percentage = (count / maxCount) * 100;
-        barInner.style.cssText = `width: ${percentage}%; height: 100%; background: var(--primary-red); transition: width 0.5s ease;`;
-
-        barOuter.appendChild(barInner);
-        barWrapper.appendChild(label);
-        barWrapper.appendChild(barOuter);
-        chartContainer.appendChild(barWrapper);
+        // Animate bar height after a short delay
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                bar.style.height = heightPct + '%';
+            }, 100);
+        });
     });
 }
 
@@ -148,9 +257,9 @@ function displayBloodGroupChart(bloodGroupData) {
 
 window.exportAnalyticsReport = async function () {
     try {
-        showSuccess('Generating analytics report...');
+        if (typeof showSuccess === 'function') showSuccess('Generating analytics report...');
 
-        const [donorStats, stockStats, aiMetrics] = await Promise.all([
+        const [donorStats, stockStats, aiMetrics] = await Promise.allSettled([
             API.donors.getStatistics(),
             API.bloodStock.getStatistics(),
             API.ai.getMetrics(),
@@ -158,9 +267,9 @@ window.exportAnalyticsReport = async function () {
 
         const report = {
             generated_at: new Date().toISOString(),
-            donor_statistics: donorStats.data,
-            blood_stock_statistics: stockStats.data,
-            ai_metrics: aiMetrics.data,
+            donor_statistics: donorStats.status === 'fulfilled' ? donorStats.value.data : null,
+            blood_stock_statistics: stockStats.status === 'fulfilled' ? stockStats.value.data : null,
+            ai_metrics: aiMetrics.status === 'fulfilled' ? aiMetrics.value.data : null,
         };
 
         // Download as JSON
@@ -172,9 +281,9 @@ window.exportAnalyticsReport = async function () {
         a.click();
         URL.revokeObjectURL(url);
 
-        showSuccess('Analytics report downloaded!');
+        if (typeof showSuccess === 'function') showSuccess('Analytics report downloaded!');
     } catch (error) {
         console.error('Error exporting analytics:', error);
-        showError('Failed to export analytics report');
+        if (typeof showError === 'function') showError('Failed to export analytics report');
     }
 };

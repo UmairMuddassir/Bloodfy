@@ -44,6 +44,7 @@ class DonorListView(APIView):
         is_eligible = request.query_params.get('is_eligible')
         
         if blood_group:
+            blood_group = blood_group.replace(' ', '+')
             queryset = queryset.filter(blood_group=blood_group)
         if city:
             queryset = queryset.filter(city__icontains=city)
@@ -367,8 +368,26 @@ class DonorReactivateView(APIView):
         donor.update_eligibility()
         
         if not was_eligible and donor.is_eligible:
-            # TODO: Send reactivation notification
-            pass
+            # Send reactivation notification via AppNotification and Email
+            try:
+                AppNotification.objects.create(
+                    user=donor.user,
+                    title="Account Reactivated",
+                    message="Your donor account is now eligible for blood donations again.",
+                    notification_type='info',
+                    related_id=str(donor.id)
+                )
+                from django.core.mail import send_mail
+                from django.conf import settings
+                send_mail(
+                    subject='Bloodify - Donor Account Reactivated',
+                    message='Great news! Your donor account has been marked as eligible again. You can now donate blood and help save lives.',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[donor.user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
         
         return success_response(
             data={
@@ -394,6 +413,7 @@ class DonorPendingListView(APIView):
         return success_response(
             data={
                 'pending_requests': serializer.data,
+                'requests': serializer.data, # Added for backward compatibility with cached JS
                 'count': queryset.count()
             },
             message="Pending donor requests retrieved successfully"

@@ -73,6 +73,11 @@ function protectPage() {
 
     // Context: ADMIN Directory
     if (context === 'ADMIN_DIR') {
+        // Emergency page is PUBLIC - no login required
+        if (currentPage === 'emergency.html') {
+            return; // Allow without auth
+        }
+
         if (!isAuthenticated()) {
             // Not logged in -> Go to Admin Login
             window.location.href = '../../auth/admin-login.html';
@@ -90,6 +95,11 @@ function protectPage() {
 
     // Context: USER Directory
     if (context === 'USER_DIR') {
+        // Emergency page is PUBLIC - no login required
+        if (currentPage === 'emergency.html') {
+            return; // Allow without auth
+        }
+
         if (!isAuthenticated()) {
             // Not logged in -> Go to User Login
             window.location.href = '../../auth/user-login.html';
@@ -206,15 +216,22 @@ function displayUserInfo() {
  */
 async function handleLogout() {
     try {
-        // Call backend logout endpoint
-        await API.auth.logout();
+        if (window.API && API.auth && typeof API.auth.logout === 'function') {
+            await API.auth.logout();
+        }
     } catch (error) {
         console.error('Logout error:', error);
     } finally {
-        // Always clear local data and redirect
-        clearAuthToken();
+        // Clear ALL possible auth keys
+        const keys = [
+            'access_token', 'refresh_token', 'user_data', 'bloodify_token', 
+            'bloodify_auth_token', 'bloodify_refresh_token', 'bloodify_user_data'
+        ];
+        keys.forEach(k => localStorage.removeItem(k));
+        sessionStorage.clear();
+        
         // Redirect to auth page. Since we are in separate folders, we should use a path that works.
-        // If we are deep (admin/pages), go up 2 levels.
+        // If we are deep (admin/pages or user/pages), go up 2 levels.
         const context = getPageContext();
         if (context === 'ADMIN_DIR' || context === 'USER_DIR') {
             window.location.href = '../../auth/user-login.html';
@@ -550,7 +567,12 @@ function hideModal(modalId) {
 // Initialize on page load
 // =============================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initializePage();
+        setupLogoutHandlers();
+    });
+} else {
     initializePage();
     setupLogoutHandlers();
-});
+}

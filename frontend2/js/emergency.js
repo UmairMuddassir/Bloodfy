@@ -114,7 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (result.success && result.data) {
-                    displaySearchResults(result.data, bloodGroup, location, locationMethod);
+                    const locationCity = location;
+                    // Update Leaflet map for the searched city
+                    let hospitalCenter = [31.5204, 74.3587]; // default Lahore
+                    if (window.initLeafletMap) {
+                        hospitalCenter = window.initLeafletMap(locationCity);
+                    }
+                    displaySearchResults(result.data, bloodGroup, location, locationMethod, hospitalCenter);
                 } else {
                     throw new Error('Invalid response from server');
                 }
@@ -138,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Display Search Results
     // =============================================================================
 
-    function displaySearchResults(data, bloodGroup, location, locationMethod = 'city-based') {
+    function displaySearchResults(data, bloodGroup, location, locationMethod = 'city-based', hospitalCenter = [31.5204, 74.3587]) {
         if (!resultsSection) return;
 
         // Update results header
@@ -175,6 +181,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const donors = data.donors || [];
 
+        // Plot donors on Leaflet map
+        if (window.plotDonorsOnMap) {
+            window.plotDonorsOnMap(donors, hospitalCenter);
+        }
+
         if (donors.length === 0) {
             const noResultsMessage = document.createElement('div');
             noResultsMessage.style.cssText = 'text-align: center; padding: 40px; color: var(--text-secondary);';
@@ -189,33 +200,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Create cards for each donor
         donors.forEach((donor, index) => {
-            // Get initials for avatar
             const name = donor.name || 'Unknown';
             const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-            const distance = donor.distance || 0;
-            const city = donor.city || 'Unknown';
+            const rank = index + 1;
 
-            // Determine what to show in the badge
-            let badgeContent;
-            if (distance > 0) {
-                badgeContent = `<i class="fa-solid fa-route"></i> ${distance.toFixed(1)} km away`;
-            } else {
-                badgeContent = `<i class="fa-solid fa-location-dot"></i> ${city}`;
-            }
+            // Distance & ETA display
+            const distText = donor.distance
+                ? `<i class="fa-solid fa-route"></i> ${donor.distance} km away`
+                : `<i class="fa-solid fa-location-dot"></i> ${donor.city || 'Unknown'}`;
 
-            // Create card
+            const etaText = donor.eta_minutes
+                ? `<i class="fa-solid fa-clock" style="color:#00C853;"></i> ~${donor.eta_minutes} min ETA`
+                : '';
+
+            // Rank badge color
+            const rankColors = ['#00C853','#4CAF50','#8BC34A','#FFC107','#FF9800','#FF5722'];
+            const rankColor = rankColors[Math.min(rank - 1, rankColors.length - 1)];
+
             const card = document.createElement('div');
             card.className = 'donor-result-card';
             card.style.animation = `fadeIn 0.5s ease ${index * 0.1}s both`;
-
             card.innerHTML = `
                 <div class="donor-info">
-                    <div class="donor-avatar">${initials}</div>
+                    <div class="donor-avatar" style="position:relative;">
+                        ${initials}
+                        <span style="position:absolute;top:-6px;left:-6px;background:${rankColor};color:white;border-radius:50%;width:20px;height:20px;font-size:0.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #121212;">#${rank}</span>
+                    </div>
                     <div>
-                        <h4 style="font-size: 1.1rem;">${name}</h4>
-                        <span class="dist-badge">
-                            ${badgeContent}
-                        </span>
+                        <h4 style="font-size:1.05rem;">${name}</h4>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+                            <span class="dist-badge">${distText}</span>
+                            ${etaText ? `<span class="dist-badge" style="background:rgba(0,200,83,0.15);color:#00C853;">${etaText}</span>` : ''}
+                        </div>
                     </div>
                 </div>
                 <div class="action-btns">
@@ -277,17 +293,120 @@ document.addEventListener('DOMContentLoaded', () => {
     // =============================================================================
 
     async function handleSMS(donorId, donorName) {
-        // First, get the donor's phone number from the button
-        const button = document.querySelector(`[data-donor-id="${donorId}"][data-action="sms"]`);
-        const phoneNumber = button?.closest('.donor-result-card')?.querySelector('[data-action="call"]')?.dataset.phone;
+        // Send SMS via Twilio backend API (not native SMS)
+        const smsButton = document.querySelector(`[data-donor-id="${donorId}"][data-action="sms"]`);
+        if (!smsButton) return;
 
-        if (!phoneNumber) {
-            showError('Phone number not available for this donor');
-            return;
+        // Show loading on button
+        const originalHTML = smsButton.innerHTML;
+        smsButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        smsButton.disabled = true;
+
+        try {
+            // Call backend API to send SMS via Twilio
+            const response = await fetch(`${API_CONFIG.BASE_URL}/donors/emergency/contact/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('bloodify_auth_token')}`
+                },
+                body: JSON.stringify({
+                    donor_id: donorId,
+                    contact_type: 'SMS'
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                const data = result.data || {};
+                const smsStatus = data.sms_status || 'sent';
+                const smsMessage = data.sms_message || 'Emergency blood request alert';
+                const donorPhone = data.donor_phone || 'Unknown';
+                const isDelivered = smsStatus === 'delivered';
+                const isLogged = smsStatus === 'logged' || data.sms_mode === 'fallback' || data.sms_mode === 'log_only';
+                
+                // Show SMS preview modal
+                showSMSPreviewModal(donorName, donorPhone, smsMessage, isDelivered, smsStatus);
+                
+                // Show green checkmark on button
+                smsButton.innerHTML = '<i class="fas fa-check"></i>';
+                smsButton.style.background = '#00C853';
+                setTimeout(() => {
+                    smsButton.innerHTML = originalHTML;
+                    smsButton.style.background = '';
+                    smsButton.disabled = false;
+                }, 3000);
+            } else {
+                throw new Error(result.message || 'SMS failed');
+            }
+        } catch (error) {
+            console.error('SMS Error:', error);
+            
+            const phoneNumber = smsButton?.closest('.donor-result-card')?.querySelector('[data-action="call"]')?.dataset.phone;
+            if (error.status === 401 || error.status === 403) {
+                showError('Login required to send SMS. Showing phone number instead.');
+                if (phoneNumber) showPhoneNumberCard(donorName, phoneNumber, 'SMS');
+            } else {
+                showError(`SMS failed: ${error.message || 'Server error'}. Try calling instead.`);
+            }
+            
+            smsButton.innerHTML = originalHTML;
+            smsButton.disabled = false;
         }
+    }
 
-        // Show phone number card
-        showPhoneNumberCard(donorName, phoneNumber, 'SMS');
+    // =============================================================================
+    // SMS Preview Modal — Shows message content to admin
+    // =============================================================================
+
+    function showSMSPreviewModal(donorName, donorPhone, message, isDelivered, statusText) {
+        // Remove existing
+        const existing = document.querySelector('.sms-preview-modal');
+        if (existing) existing.remove();
+
+        const statusColor = isDelivered ? '#00C853' : '#FF9800';
+        const statusIcon = isDelivered ? 'check-circle' : 'info-circle';
+        const statusLabel = isDelivered ? '✅ Delivered via Twilio' : '📋 SMS Logged (Twilio Trial Limit)';
+
+        const modal = document.createElement('div');
+        modal.className = 'sms-preview-modal';
+        modal.innerHTML = `
+            <div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);z-index:9999;display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)this.parentElement.remove()">
+                <div style="background:#1a1a1a;border:1px solid ${statusColor}44;border-radius:16px;padding:30px;width:90%;max-width:440px;position:relative;animation:slideUp 0.3s ease;">
+                    <button onclick="this.closest('.sms-preview-modal').remove()" style="position:absolute;top:12px;right:15px;background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;"><i class="fas fa-times"></i></button>
+                    
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <div style="background:${statusColor}22;border-radius:50%;width:55px;height:55px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+                            <i class="fas fa-${statusIcon}" style="color:${statusColor};font-size:1.4rem;"></i>
+                        </div>
+                        <h3 style="font-size:1.2rem;color:white;margin-bottom:5px;">SMS Alert Sent</h3>
+                        <span style="background:${statusColor}22;color:${statusColor};padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;">${statusLabel}</span>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:15px;margin-bottom:15px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <i class="fas fa-user" style="color:#FF5252;"></i>
+                            <div>
+                                <div style="font-size:0.75rem;color:#888;">To:</div>
+                                <div style="color:white;font-weight:600;">${donorName}</div>
+                            </div>
+                            <div style="margin-left:auto;background:rgba(41,98,255,0.15);color:#448AFF;padding:4px 10px;border-radius:6px;font-size:0.8rem;font-weight:600;">
+                                <i class="fas fa-phone"></i> ${donorPhone}
+                            </div>
+                        </div>
+                        <div style="font-size:0.75rem;color:#888;margin-bottom:6px;">Message:</div>
+                        <div style="color:#ddd;font-size:0.9rem;line-height:1.6;white-space:pre-line;background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;border-left:3px solid ${statusColor};">${message}</div>
+                    </div>
+
+                    <button onclick="this.closest('.sms-preview-modal').remove()" style="width:100%;padding:11px;background:${statusColor};border:none;border-radius:10px;color:white;font-weight:600;cursor:pointer;font-family:Poppins,sans-serif;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+                        <i class="fas fa-check"></i> OK, Got It
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
     }
 
     // =============================================================================
@@ -396,11 +515,15 @@ document.addEventListener('DOMContentLoaded', () => {
         closePhoneModal();
 
         if (contactType === 'CALL') {
-            // Initiate phone call
+            // Initiate phone call (native)
             window.location.href = `tel:${phoneNumber}`;
         } else {
-            // Initiate SMS
-            window.location.href = `sms:${phoneNumber}`;
+            // For SMS, copy number to clipboard instead of native sms:
+            navigator.clipboard.writeText(phoneNumber).then(() => {
+                showToast('Phone number copied! SMS was sent via Twilio.', 'success');
+            }).catch(() => {
+                showToast('Phone: ' + phoneNumber, 'info');
+            });
         }
     };
 

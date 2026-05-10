@@ -94,21 +94,38 @@ class SendManualNotificationView(APIView):
             delivery_status='pending'
         )
         
-        # Notification delivery — logs the notification and marks as sent.
-        # Twilio/Email integration can be added by implementing a delivery
-        # service and calling it here before updating the status.
+        # Notification delivery via Twilio SMS or Email
         from django.utils import timezone
+        from notifications.sms_service import TwilioSMSService
         import logging
         logger = logging.getLogger('bloodfy')
         
+        if message_type == 'sms' and notification.recipient_phone:
+            # Send SMS via Twilio
+            sms_service = TwilioSMSService()
+            sms_result = sms_service.send_sms(
+                to_phone=notification.recipient_phone,
+                message=message_content,
+            )
+            
+            if sms_result['success']:
+                notification.delivery_status = 'delivered'
+                notification.external_id = sms_result.get('sid', '')
+            else:
+                notification.delivery_status = 'failed'
+                notification.delivery_error = sms_result.get('error', '')
+        else:
+            # Email or push notification — log and mark as sent
+            notification.delivery_status = 'sent'
+        
         logger.info(
-            "Notification [%s] to %s (%s): %s",
+            "Notification [%s] to %s (%s): %s — Status: %s",
             message_type,
             donor.user.get_full_name(),
             notification.recipient_phone or notification.recipient_email,
             message_content[:80],
+            notification.delivery_status,
         )
-        notification.delivery_status = 'sent'
         notification.sent_at = timezone.now()
         notification.save()
         
@@ -257,3 +274,68 @@ class AppNotificationAPIView(APIView):
         # Mark all as read if no ID provided
         AppNotification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return success_response(message="All notifications marked as read")
+
+class SendBulkNotificationView(APIView):
+    """Send bulk notification to multiple donors (Admin only)."""
+    
+    permission_classes = [IsAuthenticated, IsAdmin]
+    
+    def post(self, request):
+        """Send a manual notification to multiple donors."""
+        donor_ids = request.data.get('donor_ids', [])
+        message_content = request.data.get('message_content', '')
+        
+        if not donor_ids or not message_content:
+            return error_response(
+                message="Donor IDs and message content are required",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+            
+        donors = Donor.objects.select_related('user').filter(id__in=donor_ids)
+        if not donors.exists():
+            return error_response(
+                message="No valid donors found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+            
+        from django.utils import timezone
+        from notifications.sms_service import TwilioSMSService
+        import logging
+        logger = logging.getLogger('bloodfy')
+        
+        sms_service = TwilioSMSService()
+        sent_count = 0
+        
+        for donor in donors:
+            notification = NotificationLog.objects.create(
+                donor=donor,
+                message_type='sms',
+                message_content=message_content,
+                recipient_phone=donor.user.phone_number,
+                recipient_email=donor.user.email,
+                delivery_status='pending'
+            )
+            
+            if donor.user.phone_number:
+                sms_result = sms_service.send_sms(
+                    to_phone=donor.user.phone_number,
+                    message=message_content,
+                )
+                if sms_result['success']:
+                    notification.delivery_status = 'delivered'
+                    notification.external_id = sms_result.get('sid', '')
+                    sent_count += 1
+                else:
+                    notification.delivery_status = 'failed'
+                    notification.delivery_error = sms_result.get('error', '')
+            else:
+                notification.delivery_status = 'failed'
+                notification.delivery_error = 'No phone number available'
+                
+            notification.sent_at = timezone.now()
+            notification.save()
+            
+        return success_response(
+            message=f"Bulk SMS processed. Sent: {sent_count}/{donors.count()}",
+            data={'sent_count': sent_count, 'total': donors.count()}
+        )

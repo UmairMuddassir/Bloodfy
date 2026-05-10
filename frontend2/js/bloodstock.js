@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 stocks.forEach(stock => {
                     const row = document.createElement('div');
-                    row.className = 'table-row';
+                    row.className = 'custom-table-row';
                     row.dataset.stockId = stock.id;
 
                     const isCritical = stock.units_available < 20;
@@ -490,32 +490,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     window.exportStockToCSV = async function () {
         try {
-            showSuccess('Generating CSV export...');
+            showSuccess('Generating CSV export from server...');
 
-            const stockData = await API.bloodStock.getList();
+            const token = getAuthToken();
+            const response = await fetch(`${API_CONFIG.BASE_URL}/blood-stock/export/`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
-            if (stockData.success && stockData.data) {
-                const stocks = Array.isArray(stockData.data) ? stockData.data : (stockData.data.blood_stock || stockData.data.results || []);
-
-                // Create CSV content
-                const csvHeaders = ['Blood Group', 'Hospital Name', 'City', 'Units Available', 'Contact Number', 'Last Updated'];
-                const csvRows = stocks.map(stock => [
-                    stock.blood_group,
-                    stock.hospital_name,
-                    stock.hospital_city || '',
-                    stock.units_available,
-                    stock.contact_number || '',
-                    new Date(stock.last_updated || stock.updated_at).toLocaleString()
-                ]);
-
-                // Combine headers and rows
-                const csvContent = [
-                    csvHeaders.join(','),
-                    ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
-                ].join('\n');
-
-                // Create and download file
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            if (response.ok) {
+                const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -524,6 +510,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 URL.revokeObjectURL(url);
 
                 showSuccess('CSV exported successfully!');
+            } else {
+                showError('Failed to export CSV from server');
             }
         } catch (error) {
             console.error('Error exporting CSV:', error);

@@ -38,59 +38,97 @@ class ChatQueryView(APIView):
         message = serializer.validated_data['message']
         session_id = serializer.validated_data.get('session_id')
         
-        # Get or create session
-        if session_id:
-            try:
-                session = ChatSession.objects.get(id=session_id)
-            except ChatSession.DoesNotExist:
-                session = None
-        else:
+        try:
+            # Get or create session
             session = None
-        
-        if not session:
-            session = ChatSession.objects.create(
-                user=request.user if request.user.is_authenticated else None,
-                session_key=str(uuid.uuid4())
+            if session_id:
+                try:
+                    session = ChatSession.objects.get(id=session_id)
+                except (ChatSession.DoesNotExist, Exception):
+                    session = None
+            
+            if not session:
+                session = ChatSession.objects.create(
+                    user=request.user if request.user.is_authenticated else None,
+                    session_key=str(uuid.uuid4())
+                )
+            
+            # Save user message
+            ChatMessage.objects.create(
+                session=session,
+                message_type='user',
+                content=message
+            )
+            
+            # Process with chatbot service
+            service = ChatbotService(
+                user=request.user if request.user.is_authenticated else None
+            )
+            response_data = service.process_query(message, str(session.id))
+            
+            # Save bot response — handle faq_id carefully
+            faq_id = response_data.get('faq_id')
+            faq_obj = None
+            if faq_id:
+                try:
+                    faq_obj = FAQ.objects.get(id=faq_id)
+                except (FAQ.DoesNotExist, Exception):
+                    faq_obj = None
+            
+            ChatMessage.objects.create(
+                session=session,
+                message_type='bot',
+                content=response_data['message'],
+                intent=response_data.get('intent', 'unknown'),
+                confidence=response_data.get('confidence', 0.5),
+                faq_matched=faq_obj
+            )
+            
+            # Update session message count
+            session.message_count += 2
+            session.save(update_fields=['message_count'])
+            
+            return success_response(
+                data={
+                    'message': response_data['message'],
+                    'intent': response_data.get('intent', 'unknown'),
+                    'confidence': response_data.get('confidence', 0.5),
+                    'session_id': str(session.id),
+                    'faq_id': response_data.get('faq_id'),
+                    'suggestions': response_data.get('suggestions', [])
+                },
+                message="Query processed"
             )
         
-        # Save user message
-        user_message = ChatMessage.objects.create(
-            session=session,
-            message_type='user',
-            content=message
-        )
-        
-        # Process with chatbot service
-        service = ChatbotService(
-            user=request.user if request.user.is_authenticated else None
-        )
-        response_data = service.process_query(message, str(session.id))
-        
-        # Save bot response
-        bot_message = ChatMessage.objects.create(
-            session=session,
-            message_type='bot',
-            content=response_data['message'],
-            intent=response_data['intent'],
-            confidence=response_data['confidence'],
-            faq_matched_id=response_data['faq_id']
-        )
-        
-        # Update session message count
-        session.message_count += 2
-        session.save(update_fields=['message_count'])
-        
-        return success_response(
-            data={
-                'message': response_data['message'],
-                'intent': response_data['intent'],
-                'confidence': response_data['confidence'],
-                'session_id': str(session.id),
-                'faq_id': response_data['faq_id'],
-                'suggestions': response_data.get('suggestions', [])
-            },
-            message="Query processed"
-        )
+        except Exception as e:
+            import traceback
+            print(f"[CHATBOT ERROR] {traceback.format_exc()}")
+            
+            # Return a helpful fallback response instead of crashing
+            return success_response(
+                data={
+                    'message': (
+                        "I'm the Bloodify AI Assistant! 🤖\n\n"
+                        "I can help you with:\n"
+                        "🩸 Blood stock & availability\n"
+                        "👤 Donor registration & eligibility\n"
+                        "🔍 Finding compatible donors\n"
+                        "🚨 Emergency blood requests\n\n"
+                        "Try asking: \"Check A+ stock\" or \"Am I eligible to donate?\""
+                    ),
+                    'intent': 'fallback',
+                    'confidence': 0.5,
+                    'session_id': None,
+                    'faq_id': None,
+                    'suggestions': [
+                        "Check blood stock",
+                        "How to register?",
+                        "Am I eligible?",
+                        "Emergency request"
+                    ]
+                },
+                message="Query processed"
+            )
 
 
 class FAQListView(APIView):

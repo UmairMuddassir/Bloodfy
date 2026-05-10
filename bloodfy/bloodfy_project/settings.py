@@ -10,16 +10,28 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+import dj_database_url
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production')
+# SECURITY: Secret key must be set via environment variable.
+# Falls back to insecure key ONLY in explicit development mode.
+_debug_mode = os.getenv('DEBUG', 'False').lower() == 'true'
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if _debug_mode:
+        SECRET_KEY = 'django-insecure-dev-only-key-not-for-production'
+    else:
+        raise RuntimeError('SECRET_KEY environment variable is required in production')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
+# SECURITY: Debug mode defaults to OFF
+DEBUG = _debug_mode
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 
 # Application definition
@@ -51,6 +63,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -81,33 +94,12 @@ WSGI_APPLICATION = 'bloodfy_project.wsgi.application'
 
 
 # Database Configuration
-# Use SQLite by default, MySQL if DATABASE_URL is provided
-DATABASE_URL = os.getenv('DATABASE_URL', '')
-
-if DATABASE_URL:
-    # MySQL configuration
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': os.getenv('DATABASE_NAME', 'bloodfy_db'),
-            'USER': os.getenv('DATABASE_USER', 'root'),
-            'PASSWORD': os.getenv('DATABASE_PASSWORD', ''),
-            'HOST': os.getenv('DATABASE_HOST', 'localhost'),
-            'PORT': os.getenv('DATABASE_PORT', '3306'),
-            'OPTIONS': {
-                'charset': 'utf8mb4',
-                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            },
-        }
-    }
-else:
-    # SQLite configuration (default for development)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL', f'sqlite:///{BASE_DIR / "db.sqlite3"}'),
+        conn_max_age=600
+    )
+}
 
 
 # Password validation
@@ -164,10 +156,13 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
+        'anon': '60/hour',
+        'user': '500/hour',
+        'login': '5/minute',
+        'otp': '3/minute',
     },
 }
 
@@ -188,7 +183,7 @@ SIMPLE_JWT = {
 
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True # Set to True for development to avoid origin mismatches
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in development mode
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS', 
     'http://localhost:3000,http://127.0.0.1:5500,http://localhost:5173,http://localhost:8000,http://127.0.0.1:8000'
@@ -285,3 +280,78 @@ LOGGING = {
 # Create logs directory if it doesn't exist
 LOGS_DIR = BASE_DIR / 'logs'
 LOGS_DIR.mkdir(exist_ok=True)
+
+
+# =============================================================================
+# Production Security Hardening
+# =============================================================================
+
+if not DEBUG:
+    # HTTPS enforcement
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # HSTS — tell browsers to always use HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Secure cookies
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
+    # Security headers
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+    # Restrict JSON renderer only (no browsable API)
+    REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
+        'rest_framework.renderers.JSONRenderer',
+    ]
+
+
+# =============================================================================
+# Twilio SMS Configuration
+# =============================================================================
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
+TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '')
+
+# =============================================================================
+# Google Maps API Configuration
+# =============================================================================
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
+
+# =============================================================================
+# Dialogflow Chatbot Configuration
+# =============================================================================
+DIALOGFLOW_PROJECT_ID = os.getenv('DIALOGFLOW_PROJECT_ID', '')
+
+# =============================================================================
+# Celery Configuration (Background Task Queue)
+# =============================================================================
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 300  # 5 minutes max per task
+
+# =============================================================================
+# Email Configuration
+# =============================================================================
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Bloodify <noreply@bloodify.com>')

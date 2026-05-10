@@ -27,7 +27,7 @@ async function fetchPendingRequests() {
         const response = await API.donors.getPendingRequests();
 
         if (response.success && response.data) {
-            const requests = response.data.requests || [];
+            const requests = response.data.pending_requests || response.data.requests || [];
 
             if (requests.length === 0) {
                 tableBody.innerHTML = `
@@ -57,7 +57,7 @@ function renderRequests(requests, container) {
     requests.forEach(req => {
         const tr = document.createElement('tr');
 
-        const userName = req.user_name || req.user?.email || 'Unknown';
+        const userName = req.name || req.email || 'Unknown';
         const initials = userName.charAt(0).toUpperCase();
         const dateStr = new Date(req.created_at).toLocaleDateString();
 

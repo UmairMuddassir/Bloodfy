@@ -88,11 +88,18 @@
     function setupLogout() {
         const handleLogoutClick = (e) => {
             e.preventDefault();
+            // Clear all auth data
             if (typeof clearAuthToken === 'function') {
                 clearAuthToken();
             }
-            // Redirect to user auth page by default
-            window.location.href = '../auth/user-login.html';
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user_data');
+            localStorage.removeItem('bloodify_token');
+            sessionStorage.clear();
+            
+            // Admin pages are at /admin/pages/ — need ../../ to reach /auth/
+            window.location.href = '../../auth/user-login.html';
         };
 
         const logoutBtn = document.getElementById('logoutBtn');

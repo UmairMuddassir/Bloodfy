@@ -159,7 +159,7 @@ function displayRequests(requests, container) {
 
     requests.forEach(request => {
         const row = document.createElement('div');
-        row.className = document.querySelector('.requests-main') ? 'request-row' : 'table-row';
+        row.className = document.querySelector('.requests-main') ? 'grid-request-row' : 'grid-table-row';
         row.dataset.requestId = request.id;
 
         const patientName = request.patient_name || request.recipient_name || 'Unknown Patient';
@@ -192,11 +192,15 @@ function displayRequests(requests, container) {
         row.innerHTML = `
             <div class="patient-name">${patientName}</div>
             <div><span class="blood-type-tag">${bloodGroup}</span></div>
+            <div style="font-weight: 500; color: #E2E8F0;">
+                <span style="color: ${request.units_fulfilled >= request.units_required ? '#00C853' : '#FFAB00'}">${request.units_fulfilled || 0}</span> 
+                <span style="color: #94A3B8;">/ ${request.units_required || 1}</span>
+            </div>
             <div>${location}</div>
             <div><span class="status-tag ${statusClass}">${displayStatus}</span></div>
             <div class="table-actions">
                 ${(statusLower === 'pending' || statusLower === 'matched' || (statusLower === 'approved' && !request.assigned_donor_info)) ? `
-                    ${(isAdmin() && statusLower === 'pending') ? `<button class="btn-table" onclick="approveRequest('${request.id}')" style="background:#1976D2;">Approve</button>` : ''}
+                    ${(isAdmin() && statusLower === 'pending') ? `<button class="btn-table" onclick="approveRequest('${request.id}')" style="background:#1976D2; color:white; border:none;">Approve</button>` : ''}
                     ${isAdmin() ? `<button class="btn-table" onclick="assignDonor('${request.id}')">Assign</button>` : ''}
                 ` : ''}
                 
@@ -204,11 +208,11 @@ function displayRequests(requests, container) {
                 
                 ${(isAdmin() || isOwner(request)) ? `
                     ${(statusLower === 'approved' || statusLower === 'in_progress' || statusLower === 'matched' || statusLower === 'assigned') ? `
-                        <button class="btn-table" onclick="completeRequest('${request.id}')" style="background:#00C853;">Complete</button>
+                        <button class="btn-table" onclick="completeRequest('${request.id}')" style="background:#00C853; color:white; border:none;">Complete</button>
                     ` : ''}
                     
                     ${(statusLower !== 'completed' && statusLower !== 'cancelled') ? `
-                        <button class="btn-table" onclick="deleteRequest('${request.id}')" style="background:#E53935;">Delete</button>
+                        <button class="btn-table" onclick="deleteRequest('${request.id}')" style="background:#E53935; color:white; border:none;">Delete</button>
                     ` : ''}
                 ` : ''}
             </div>
@@ -679,12 +683,12 @@ window.deleteRequest = async function (requestId) {
 };
 
 window.completeRequest = async function (requestId) {
-    if (!confirm('Mark this request as COMPLETED?')) return;
+    if (!confirm('Are you sure you want to process this request?')) return;
 
     try {
         const result = await API.requests.complete(requestId);
         if (result.success) {
-            alert('Request marked as completed');
+            alert(result.message || 'Request marked as completed');
             await loadRequestsList();
             await loadPatientStats();
         }

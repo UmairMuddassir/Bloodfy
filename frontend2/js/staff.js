@@ -31,7 +31,11 @@ async function loadStaffList() {
 
         if (response.success && response.data) {
             // Updated to use new backend structure
-            const users = response.data.users || (Array.isArray(response.data) ? response.data : []);
+            let users = response.data.users || (Array.isArray(response.data) ? response.data : []);
+            
+            // Only show admins and superusers in the staff panel
+            users = users.filter(u => u.user_type === 'admin' || u.is_superuser || u.is_staff);
+            
             renderStaffTable(users);
         }
     } catch (error) {

@@ -13,6 +13,9 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
         :root {
             --primary-red: #c62828;
@@ -391,7 +394,7 @@
             font-size: 0.9rem;
         }
 
-        .table-row {
+        .custom-table-row {
             display: grid;
             grid-template-columns: 1fr 1.5fr 1fr 2fr 1fr;
             gap: 15px;
@@ -401,11 +404,11 @@
             transition: background-color 0.3s ease;
         }
 
-        .table-row:last-child {
+        .custom-table-row:last-child {
             border-bottom: none;
         }
 
-        .table-row:hover {
+        .custom-table-row:hover {
             background-color: rgba(255, 255, 255, 0.05);
         }
 
@@ -662,7 +665,7 @@
                     </div>
 
                     <div class="table-body">
-                        <div class="table-row">
+                        <div class="custom-table-row">
                             <div><span class="blood-badge">A+</span></div>
                             <div>Jinnah Hospital</div>
                             <div>80</div>
@@ -672,7 +675,7 @@
                                 <button class="btn-action"><i class="fa-solid fa-trash"></i></button>
                             </div>
                         </div>
-                        <div class="table-row">
+                        <div class="custom-table-row">
                             <div><span class="blood-badge">O-</span></div>
                             <div>Services Hospital</div>
                             <div style="color: #FF5252; font-weight:bold;">5 (Critical)</div>
@@ -682,7 +685,7 @@
                                 <button class="btn-action"><i class="fa-solid fa-trash"></i></button>
                             </div>
                         </div>
-                        <div class="table-row">
+                        <div class="custom-table-row">
                             <div><span class="blood-badge">B+</span></div>
                             <div>General Hospital</div>
                             <div>45</div>
@@ -692,7 +695,7 @@
                                 <button class="btn-action"><i class="fa-solid fa-trash"></i></button>
                             </div>
                         </div>
-                        <div class="table-row">
+                        <div class="custom-table-row">
                             <div><span class="blood-badge">AB+</span></div>
                             <div>Mayo Hospital</div>
                             <div>60</div>
@@ -708,6 +711,9 @@
 
         </main>
     </div>
+
+    <!-- Security Utilities (XSS Protection) -->
+    <script src="../../js/core/security.js"></script>
 
     <!-- API Configuration -->
     <script src="../../config/api-config.js"></script>

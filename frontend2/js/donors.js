@@ -81,11 +81,17 @@ function displayDonors(donors, container) {
         const status = donor.is_eligible ? 'Eligible' : 'Cooldown';
         const statusClass = donor.is_eligible ? 'status-eligible' : 'status-cooldown';
 
+        // Sanitize all user-supplied data to prevent XSS
+        const safeName = typeof escapeHtml === 'function' ? escapeHtml(userName) : userName;
+        const safeCity = typeof escapeHtml === 'function' ? escapeHtml(donor.city || 'N/A') : (donor.city || 'N/A');
+        const safePhone = typeof escapeHtml === 'function' ? escapeHtml(phone) : phone;
+        const safeBloodGroup = typeof escapeHtml === 'function' ? escapeHtml(donor.blood_group) : donor.blood_group;
+
         row.innerHTML = `
-            <td>${userName}</td>
-            <td><span class="blood-badge">${donor.blood_group}</span></td>
-            <td>${donor.city || 'N/A'}</td>
-            <td>${phone}</td>
+            <td>${safeName}</td>
+            <td><span class="blood-badge">${safeBloodGroup}</span></td>
+            <td>${safeCity}</td>
+            <td>${safePhone}</td>
             <td><span class="status-badge ${statusClass}">${status}</span></td>
             <td>
                 <button class="btn-action" onclick="viewDonorDetail('${donor.id}')" title="View">

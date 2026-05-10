@@ -11,6 +11,7 @@ import random
 import string
 
 from .models import User, OTPVerification
+from django.db import transaction
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -57,6 +58,21 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A user with this email already exists.")
         return value.lower()
     
+    def validate_cnic(self, value):
+        """Validate CNIC format and uniqueness."""
+        if value:
+            import re
+            from utils.constants import CNIC_REGEX
+            if not re.match(CNIC_REGEX, value):
+                raise serializers.ValidationError("Invalid CNIC format. Use format: XXXXX-XXXXXXX-X")
+            
+            from donors.models import Donor, DonorRequest
+            if DonorRequest.objects.filter(cnic=value).exists():
+                raise serializers.ValidationError("A donor request with this CNIC already exists.")
+            if Donor.objects.filter(cnic=value).exists():
+                raise serializers.ValidationError("A donor with this CNIC already exists.")
+        return value
+    
     def validate(self, attrs):
         """Validate passwords match."""
         if attrs['password'] != attrs['password_confirm']:
@@ -75,12 +91,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a new user (NO automatic donor profile)."""
         name = validated_data.pop('name', None)
-        # Remove donor-specific fields (not used during registration)
-        validated_data.pop('blood_group', None)
-        validated_data.pop('date_of_birth', None)
-        validated_data.pop('cnic', None)
-        validated_data.pop('medical_conditions', None)
-        validated_data.pop('last_donation_date', None)
+        # Extract donor-specific fields if they exist
+        blood_group = validated_data.pop('blood_group', None)
+        date_of_birth = validated_data.pop('date_of_birth', None)
+        cnic = validated_data.pop('cnic', None)
+        medical_conditions = validated_data.pop('medical_conditions', None)
+        last_donation_date = validated_data.pop('last_donation_date', None)
+        city = validated_data.get('city')
+        address = validated_data.get('address')
         
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
@@ -97,18 +115,43 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             else:
                 validated_data['last_name'] = ''
 
-        # Force user_type to 'user' (only admins can create other admins)
-        if validated_data.get('user_type') != 'admin':
+        # Force user_type to 'user' unless created by an authenticated admin
+        request = self.context.get('request')
+        is_admin_user = request and request.user and request.user.is_authenticated and (request.user.user_type == 'admin' or request.user.is_superuser)
+        
+        if not is_admin_user or validated_data.get('user_type') != 'admin':
             validated_data['user_type'] = 'user'
         
-        # Ensure user is active by default
-        user = User.objects.create_user(
-            password=password,
-            is_active=True,
-            **validated_data
-        )
-        
-        return user
+        # Ensure user and donor are created together safely
+        with transaction.atomic():
+            # Ensure user is active by default
+            user = User.objects.create_user(
+                password=password,
+                is_active=True,
+                **validated_data
+            )
+            
+            # Auto-create Donor Profile if blood_group is provided
+            if blood_group:
+                from donors.models import Donor
+                from django.utils import timezone
+                
+                Donor.objects.create(
+                    user=user,
+                    blood_group=blood_group,
+                    city=city or '',
+                    address=address or '',
+                    medical_history=medical_conditions or '',
+                    date_of_birth=date_of_birth,
+                    cnic=cnic or None,
+                    last_donation_date=last_donation_date
+                )
+                
+                user.donor_status = 'DONOR_APPROVED'
+                user.donor_status_updated_at = timezone.now()
+                user.save(update_fields=['donor_status', 'donor_status_updated_at'])
+            
+            return user
 
 
 class UserLoginSerializer(serializers.Serializer):
@@ -341,10 +384,10 @@ class ResendOTPSerializer(serializers.Serializer):
     )
     
     def validate_email(self, value):
-        """Validate email exists."""
+        """Validate email exists (silently fail to prevent enumeration)."""
         try:
             user = User.objects.get(email__iexact=value)
             self.user = user
         except User.DoesNotExist:
-            raise serializers.ValidationError("User with this email does not exist.")
+            self.user = None
         return value.lower()

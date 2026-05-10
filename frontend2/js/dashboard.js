@@ -180,12 +180,12 @@ async function loadPredictedDonors() {
     try {
         // Get highest priority pending request first
         const requestsData = await API.requests.getList({
-            status: 'PENDING',
-            urgency: 'HIGH'
+            status: 'pending',
+            urgency_level: 'emergency'
         });
 
         let bloodGroupNeeded = 'O-'; // Default to universal donor type
-        let urgencyLevel = 'HIGH';
+        let urgencyLevel = 'emergency';
 
         if (requestsData.success && requestsData.data) {
             const requests = Array.isArray(requestsData.data)
@@ -214,6 +214,7 @@ async function loadPredictedDonors() {
             donorList.innerHTML = '';
 
             const topDonors = aiData.data.ranked_donors.slice(0, 5);
+            window.predictedDonorIds = topDonors.map(rd => rd.donor.id); // Save for bulk SMS
 
             topDonors.forEach(rankedDonor => {
                 const donor = rankedDonor.donor;
@@ -325,10 +326,21 @@ function setupDashboardEvents() {
                     btnSendSMS.disabled = true;
                     btnSendSMS.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
 
-                    // Simulate SMS send (replace with actual API call)
-                    await new Promise(r => setTimeout(r, 1500));
+                    if (!window.predictedDonorIds || window.predictedDonorIds.length === 0) {
+                        alert('No donors available to send SMS to.');
+                        return;
+                    }
 
-                    alert('SMS notifications sent successfully!');
+                    const response = await API.notifications.sendBulk({
+                        donor_ids: window.predictedDonorIds,
+                        message_content: 'URGENT: Blood required at the hospital. You have been identified as a priority donor. Please log in to Bloodify or contact us immediately.'
+                    });
+
+                    if (response.success) {
+                        alert(`SMS notifications sent successfully to ${response.data.sent_count} donors!`);
+                    } else {
+                        alert('Failed to send SMS: ' + (response.message || 'Unknown error'));
+                    }
                 } catch (error) {
                     alert('Failed to send SMS: ' + error.message);
                 } finally {

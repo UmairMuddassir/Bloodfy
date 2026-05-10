@@ -59,8 +59,23 @@ class RegisterView(generics.CreateAPIView):
             expires_at=timezone.now() + timedelta(minutes=15)
         )
         
-        # TODO: Send OTP via email (implement email service)
-        # For now, we'll include it in response for development
+        # Send OTP via email
+        from django.core.mail import send_mail
+        from django.conf import settings
+        import logging
+        logger = logging.getLogger('bloodfy')
+        
+        try:
+            send_mail(
+                subject='Verify your Bloodify account',
+                message=f'Your verification code is: {otp}\nThis code will expire in 15 minutes.',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            logger.info(f"Verification email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
         
         # Generate tokens
         refresh = RefreshToken.for_user(user)
@@ -193,7 +208,23 @@ class ResendOTPView(APIView):
             expires_at=timezone.now() + timedelta(minutes=15)
         )
         
-        # TODO: Send OTP via email
+        # Send OTP via email
+        from django.core.mail import send_mail
+        from django.conf import settings
+        import logging
+        logger = logging.getLogger('bloodfy')
+        
+        try:
+            send_mail(
+                subject='Your new OTP code from Bloodify',
+                message=f'Your new OTP code is: {otp}\nThis code will expire in 15 minutes.',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            logger.info(f"Resent OTP email to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to resend OTP email to {user.email}: {str(e)}")
         
         return success_response(
             message="OTP sent successfully"
@@ -228,7 +259,23 @@ class PasswordResetRequestView(APIView):
                 expires_at=timezone.now() + timedelta(minutes=15)
             )
             
-            # TODO: Send OTP via email
+            # Send OTP via email
+            from django.core.mail import send_mail
+            from django.conf import settings
+            import logging
+            logger = logging.getLogger('bloodfy')
+            
+            try:
+                send_mail(
+                    subject='Bloodify Password Reset Request',
+                    message=f'Your password reset code is: {otp}\nThis code will expire in 15 minutes.\nIf you did not request this, please ignore this email.',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+                logger.info(f"Password reset email sent to {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send password reset email to {user.email}: {str(e)}")
         
         # Always return success to prevent email enumeration
         return success_response(

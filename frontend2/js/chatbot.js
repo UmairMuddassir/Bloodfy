@@ -46,7 +46,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Add bot response to UI
             if (result.success && result.data) {
-                addBotMessage(result.data.response || result.data.answer || 'I understand. How else can I help?');
+                // Backend sends 'message' key
+                const botResponse = result.data.message || result.data.response || result.data.answer || 'I understand. How else can I help?';
+                addBotMessage(botResponse);
+                
+                // Show suggestion chips if available
+                const suggestions = result.data.suggestions || [];
+                if (suggestions.length > 0) {
+                    addSuggestionChips(suggestions);
+                }
+            } else {
+                addBotMessage('Sorry, I could not process that. Please try a different question.');
             }
 
         } catch (error) {
@@ -55,8 +65,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Hide typing indicator
             hideTypingIndicator();
 
-            // Show error message
-            addBotMessage('I apologize, but I\'m having trouble processing your request right now. Please try again or contact support.');
+            // Show helpful fallback instead of generic error
+            addBotMessage(
+                "I'm having trouble connecting to the server right now. 🔄\n\n" +
+                "Please make sure the backend server is running, then try again.\n\n" +
+                "In the meantime, you can:\n" +
+                "• Check the **Emergency** page for urgent needs\n" +
+                "• Visit **Blood Stock** for inventory\n" +
+                "• Go to **Donors** page for donor info"
+            );
         } finally {
             // Re-enable input
             chatInput.disabled = false;
@@ -85,12 +102,56 @@ document.addEventListener('DOMContentLoaded', () => {
     function addBotMessage(text) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message bot';
+        
+        // Format: convert \n to <br>, **bold** to <strong>
+        let formatted = text
+            .replace(/\n/g, '<br>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
         messageDiv.innerHTML = `
             <div class="avatar"><i class="fas fa-robot"></i></div>
-            ${text}
+            <div class="bot-text">${formatted}</div>
         `;
 
         messagesContainer.appendChild(messageDiv);
+        scrollToBottom();
+    }
+
+    // =============================================================================
+    // Suggestion Chips
+    // =============================================================================
+
+    function addSuggestionChips(suggestions) {
+        const chipsDiv = document.createElement('div');
+        chipsDiv.className = 'suggestion-chips';
+        chipsDiv.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;padding:8px 0 8px 50px;';
+        
+        suggestions.forEach(text => {
+            const chip = document.createElement('button');
+            chip.textContent = text;
+            chip.style.cssText = `
+                background:rgba(229,57,53,0.15);
+                color:#FF5252;
+                border:1px solid rgba(229,57,53,0.3);
+                border-radius:20px;
+                padding:6px 14px;
+                font-size:0.8rem;
+                font-family:Poppins,sans-serif;
+                cursor:pointer;
+                transition:all 0.2s;
+                white-space:nowrap;
+            `;
+            chip.onmouseover = () => { chip.style.background = 'rgba(229,57,53,0.3)'; };
+            chip.onmouseout = () => { chip.style.background = 'rgba(229,57,53,0.15)'; };
+            chip.onclick = () => {
+                chatInput.value = text;
+                chipsDiv.remove();
+                sendMessage();
+            };
+            chipsDiv.appendChild(chip);
+        });
+
+        messagesContainer.appendChild(chipsDiv);
         scrollToBottom();
     }
 

@@ -1,0 +1,59 @@
+services:
+  # 1. Django Web Service (API)
+  - type: web
+    name: bloodify-api
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn bloodfy_project.wsgi:application
+    rootDirectory: bloodfy
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bloodify-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: bloodify-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "*" # You can restrict this later
+
+  # 2. Celery Background Worker
+  - type: worker
+    name: bloodify-worker
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: celery -A bloodfy_project worker --loglevel=info
+    rootDirectory: bloodfy
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bloodify-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: bloodify-redis
+          property: connectionString
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: bloodify-api
+          property: envVar
+          envVarKey: SECRET_KEY
+
+# 3. Managed PostgreSQL Database
+database:
+  name: bloodify-db
+  plan: free
+
+# 4. Redis for Celery Broker
+redis:
+  name: bloodify-redis
+  plan: free
+  ipAllowList: [] # Only allow internal connections

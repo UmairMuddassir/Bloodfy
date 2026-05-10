@@ -1,5 +1,6 @@
 """
 AI Engine - Donor Ranking Algorithm.
+Uses NumPy for vectorized score computation and Haversine distance calculation.
 """
 
 import logging
@@ -7,6 +8,8 @@ from decimal import Decimal
 from datetime import date
 from typing import List, Dict, Tuple
 from math import radians, cos, sin, asin, sqrt
+
+import numpy as np
 
 from django.db.models import Q
 from django.utils import timezone
@@ -108,6 +111,7 @@ def rank_donors_for_request(
     queryset = Donor.objects.filter(
         blood_group__in=BLOOD_COMPATIBILITY.get(blood_request.blood_group, []),
         is_active=True,
+        is_eligible=True, # Ensure donor is not on cooldown
     ).select_related('user')
     
     if not include_unavailable:
@@ -143,14 +147,21 @@ def rank_donors_for_request(
         responsiveness_score = calculate_responsiveness_score(donor)
         eligibility_score = calculate_eligibility_score(donor)
         
-        # Calculate weighted final score
+        # Calculate weighted final score using NumPy vectorized computation
         weights = AI_RANKING_WEIGHTS
-        final_score = (
-            weights['compatibility'] * compatibility_score +
-            weights['distance'] * distance_score +
-            weights['responsiveness'] * responsiveness_score +
-            weights['eligibility'] * eligibility_score
-        )
+        scores_array = np.array([
+            compatibility_score,
+            distance_score,
+            responsiveness_score,
+            eligibility_score,
+        ])
+        weights_array = np.array([
+            weights['compatibility'],
+            weights['distance'],
+            weights['responsiveness'],
+            weights['eligibility'],
+        ])
+        final_score = float(np.dot(scores_array, weights_array))
         
         ranked_donors.append({
             'donor': donor,

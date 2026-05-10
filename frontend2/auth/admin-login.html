@@ -9,6 +9,9 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
         :root {
             --primary-red: #E53935;
@@ -183,8 +186,58 @@
                     class="fa-solid fa-arrow-right"></i></button>
         </form>
         <div class="extra-links">
-            <a href="#">Forgot Password?</a>
+            <a href="#" onclick="showForgotModal(); return false;">Forgot Password?</a>
             <a href="#">System Support</a>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgotModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:#1a1a1a;border:1px solid rgba(229,57,53,0.4);border-radius:16px;padding:35px;width:90%;max-width:420px;position:relative;">
+            <button onclick="hideForgotModal()" style="position:absolute;top:15px;right:15px;background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;"><i class="fas fa-times"></i></button>
+            
+            <div style="text-align:center;margin-bottom:25px;">
+                <div style="background:rgba(229,57,53,0.15);border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center;margin:0 auto 15px;">
+                    <i class="fas fa-lock" style="color:#E53935;font-size:1.5rem;"></i>
+                </div>
+                <h2 style="font-size:1.4rem;margin-bottom:5px;color:white;">Reset Password</h2>
+                <p style="color:#888;font-size:0.9rem;">Enter your admin email to receive a reset OTP</p>
+            </div>
+
+            <div id="forgotMessage" style="margin-bottom:15px;"></div>
+
+            <!-- Step 1: Email -->
+            <div id="forgotStep1">
+                <div style="position:relative;margin-bottom:20px;">
+                    <input type="email" id="forgotEmail" placeholder="Your admin email" style="width:100%;padding:13px 15px 13px 42px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;font-size:0.95rem;font-family:Poppins,sans-serif;outline:none;transition:border-color 0.3s;" onfocus="this.style.borderColor='#E53935'" onblur="this.style.borderColor='rgba(255,255,255,0.15)'">
+                    <i class="fas fa-envelope" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#E53935;"></i>
+                </div>
+                <button onclick="sendResetOTP()" id="sendOtpBtn" style="width:100%;padding:13px;background:#E53935;border:none;border-radius:10px;color:white;font-weight:600;font-size:0.95rem;cursor:pointer;font-family:Poppins,sans-serif;transition:background 0.3s;" onmouseover="this.style.background='#D32F2F'" onmouseout="this.style.background='#E53935'">
+                    <i class="fas fa-paper-plane"></i> Send OTP Code
+                </button>
+            </div>
+
+            <!-- Step 2: OTP + New Password -->
+            <div id="forgotStep2" style="display:none;">
+                <div style="position:relative;margin-bottom:15px;">
+                    <input type="text" id="resetOtp" placeholder="Enter OTP code from email" maxlength="6" style="width:100%;padding:13px 15px 13px 42px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;font-size:0.95rem;font-family:Poppins,sans-serif;outline:none;letter-spacing:3px;transition:border-color 0.3s;" onfocus="this.style.borderColor='#E53935'" onblur="this.style.borderColor='rgba(255,255,255,0.15)'">
+                    <i class="fas fa-key" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#E53935;"></i>
+                </div>
+                <div style="position:relative;margin-bottom:15px;">
+                    <input type="password" id="newPassword" placeholder="New password (min 8 chars)" style="width:100%;padding:13px 15px 13px 42px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;font-size:0.95rem;font-family:Poppins,sans-serif;outline:none;transition:border-color 0.3s;" onfocus="this.style.borderColor='#E53935'" onblur="this.style.borderColor='rgba(255,255,255,0.15)'">
+                    <i class="fas fa-lock" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#E53935;"></i>
+                </div>
+                <div style="position:relative;margin-bottom:20px;">
+                    <input type="password" id="confirmNewPassword" placeholder="Confirm new password" style="width:100%;padding:13px 15px 13px 42px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#fff;font-size:0.95rem;font-family:Poppins,sans-serif;outline:none;transition:border-color 0.3s;" onfocus="this.style.borderColor='#E53935'" onblur="this.style.borderColor='rgba(255,255,255,0.15)'">
+                    <i class="fas fa-lock" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#E53935;"></i>
+                </div>
+                <button onclick="resetPassword()" id="resetBtn" style="width:100%;padding:13px;background:#E53935;border:none;border-radius:10px;color:white;font-weight:600;font-size:0.95rem;cursor:pointer;font-family:Poppins,sans-serif;transition:background 0.3s;" onmouseover="this.style.background='#D32F2F'" onmouseout="this.style.background='#E53935'">
+                    <i class="fas fa-check-circle"></i> Reset Password
+                </button>
+                <div style="text-align:center;margin-top:12px;">
+                    <a href="#" onclick="document.getElementById('forgotStep1').style.display='block';document.getElementById('forgotStep2').style.display='none';return false;" style="color:#888;font-size:0.85rem;text-decoration:none;">← Back to email</a>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -196,6 +249,99 @@
 
     <!-- Authentication Script -->
     <script src="../js/auth.js"></script>
+
+    <!-- Forgot Password Script -->
+    <script>
+        function showForgotModal() {
+            document.getElementById('forgotModal').style.display = 'flex';
+            document.getElementById('forgotEmail').value = '';
+            document.getElementById('forgotMessage').innerHTML = '';
+            document.getElementById('forgotStep1').style.display = 'block';
+            document.getElementById('forgotStep2').style.display = 'none';
+        }
+        function hideForgotModal() {
+            document.getElementById('forgotModal').style.display = 'none';
+        }
+        document.getElementById('forgotModal').addEventListener('click', function(e) {
+            if (e.target === this) hideForgotModal();
+        });
+
+        function showForgotMsg(msg, type) {
+            const colors = { success: '#4CAF50', error: '#E53935', info: '#2196F3' };
+            document.getElementById('forgotMessage').innerHTML =
+                `<div style="background:${colors[type]}22;border:1px solid ${colors[type]};color:${colors[type]};padding:10px 15px;border-radius:8px;font-size:0.85rem;"><i class="fas fa-${type==='success'?'check-circle':type==='error'?'exclamation-circle':'info-circle'}"></i> ${msg}</div>`;
+        }
+
+        async function sendResetOTP() {
+            const email = document.getElementById('forgotEmail').value.trim();
+            if (!email) { showForgotMsg('Please enter your email address.', 'error'); return; }
+
+            const btn = document.getElementById('sendOtpBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;"></span> Sending...';
+
+            try {
+                const response = await fetch(`${API_CONFIG.BASE_URL}/auth/request-password-reset/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await response.json();
+
+                if (response.ok || data.success) {
+                    showForgotMsg('OTP sent to your email! Check your inbox.', 'success');
+                    setTimeout(() => {
+                        document.getElementById('forgotStep1').style.display = 'none';
+                        document.getElementById('forgotStep2').style.display = 'block';
+                        document.getElementById('forgotMessage').innerHTML = '';
+                    }, 1500);
+                } else {
+                    showForgotMsg(data.message || 'Email not found. Please check and try again.', 'error');
+                }
+            } catch (err) {
+                showForgotMsg('Connection error. Please try again.', 'error');
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send OTP Code';
+        }
+
+        async function resetPassword() {
+            const otp = document.getElementById('resetOtp').value.trim();
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmNewPassword').value;
+            const email = document.getElementById('forgotEmail').value.trim();
+
+            if (!otp) { showForgotMsg('Please enter the OTP code.', 'error'); return; }
+            if (newPass.length < 8) { showForgotMsg('Password must be at least 8 characters.', 'error'); return; }
+            if (newPass !== confirmPass) { showForgotMsg('Passwords do not match.', 'error'); return; }
+
+            const btn = document.getElementById('resetBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;"></span> Resetting...';
+
+            try {
+                const response = await fetch(`${API_CONFIG.BASE_URL}/auth/reset-password/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, otp, new_password: newPass, confirm_password: confirmPass })
+                });
+                const data = await response.json();
+
+                if (response.ok || data.success) {
+                    showForgotMsg('Password reset successfully! You can now login.', 'success');
+                    setTimeout(() => {
+                        hideForgotModal();
+                    }, 2000);
+                } else {
+                    showForgotMsg(data.message || 'Invalid OTP or request expired. Try again.', 'error');
+                }
+            } catch (err) {
+                showForgotMsg('Connection error. Please try again.', 'error');
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle"></i> Reset Password';
+        }
+    </script>
 
 </body>
 
