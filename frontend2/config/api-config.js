@@ -10,10 +10,13 @@
 // =============================================================================
 
 const API_CONFIG = {
-    // Dynamic Base URL detection
-    BASE_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://127.0.0.1:8000/api'
-        : 'https://bloodify-api.onrender.com/api',
+    // Dynamic Base URL detection (Local vs Production)
+    BASE_URL: (
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' || 
+        window.location.hostname === '' || 
+        window.location.protocol === 'file:'
+    ) ? 'http://127.0.0.1:8000/api' : 'https://bloodify-api-gin9.onrender.com/api',
 
     // Request timeout in milliseconds
     TIMEOUT: 30000,
