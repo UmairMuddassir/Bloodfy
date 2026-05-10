@@ -292,7 +292,7 @@ LOGS_DIR.mkdir(exist_ok=True)
 
 if not DEBUG:
     # HTTPS enforcement
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = False
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
     # HSTS — tell browsers to always use HTTPS
