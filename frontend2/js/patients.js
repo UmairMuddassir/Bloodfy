@@ -227,13 +227,14 @@ function displayRequests(requests, container) {
 // =============================================================================
 
 function setupPatientPageEvents() {
-    // Add New Request button
+    // Prevent duplicate listeners
     const addBtn = document.getElementById('btnAddRequest');
-    if (addBtn) {
+    if (addBtn && !addBtn.dataset.listenerAttached) {
         addBtn.addEventListener('click', (e) => {
             e.preventDefault();
             showCreateRequestModal();
         });
+        addBtn.dataset.listenerAttached = 'true';
     }
 
     // Search functionality
@@ -379,12 +380,17 @@ window.closeCreateRequestModal = function () {
     }
 };
 
+let isSubmittingRequest = false;
+
 async function handleCreateRequest(formData) {
+    if (isSubmittingRequest) return;
+    
     const submitBtn = document.getElementById('submitRequestBtn');
     const errorContainer = document.getElementById('modal-error-container');
     const originalText = submitBtn.innerHTML;
 
     try {
+        isSubmittingRequest = true;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
         if (errorContainer) errorContainer.style.display = 'none';
@@ -433,6 +439,7 @@ async function handleCreateRequest(formData) {
             alert('Failed to create request: ' + errorMessage.replace(/<br>|<strong>|<\/strong>/g, ' '));
         }
     } finally {
+        isSubmittingRequest = false;
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
     }

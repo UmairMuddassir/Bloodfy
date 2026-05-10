@@ -66,8 +66,8 @@
         -webkit-overflow-scrolling: touch;
     }
 
-    table {
-        min-width: 600px; /* Force scroll on very small screens */
+    table, .table-header, .custom-table-row {
+        min-width: 600px !important; /* Force scroll on very small screens */
     }
 
     /* Form Layouts */
@@ -80,4 +80,20 @@
         margin: 10px !important;
         padding: 15px !important;
     }
+}
+
+/* Global Select/Dropdown Visibility Fix */
+select {
+    color: white !important;
+    background-color: rgba(0, 0, 0, 0.4) !important;
+}
+
+select option {
+    background-color: #1a1a1a !important;
+    color: white !important;
+}
+
+/* Ensure form inputs are visible */
+input, select, textarea {
+    color: white !important;
 }
