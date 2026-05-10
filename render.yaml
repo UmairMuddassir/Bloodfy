@@ -1,15 +1,10 @@
-# 1. Resources First
+# Free Tier Configuration (No Redis/Worker to avoid costs)
 databases:
   - name: bloodify-db
     plan: free
 
 services:
-  - type: redis
-    name: bloodify-redis
-    plan: free
-    ipAllowList: []
-
-  # 2. Django Web Service
+  # Only the Web Service is available on the Free tier
   - type: web
     name: bloodify-api
     runtime: python
@@ -21,34 +16,9 @@ services:
         fromDatabase:
           name: bloodify-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: bloodify-redis
-          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
         value: "*"
-
-  # 3. Celery Worker
-  - type: worker
-    name: bloodify-worker
-    runtime: python
-    buildCommand: ./build.sh
-    startCommand: celery -A bloodfy_project worker --loglevel=info
-    rootDir: bloodfy
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: bloodify-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: bloodify-redis
-          property: connectionString
-      - key: SECRET_KEY
-        generateValue: true
