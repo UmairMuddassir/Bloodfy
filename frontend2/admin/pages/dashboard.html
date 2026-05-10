@@ -630,6 +630,63 @@
         .empty-state p {
             font-size: 0.95rem;
         }
+
+        /* --- Responsive Media Queries --- */
+        @media (max-width: 1024px) {
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+
+            .sidebar.active {
+                left: 0;
+            }
+
+            .main-content {
+                width: 100%;
+            }
+
+            .header {
+                padding: 15px 20px;
+            }
+
+            .search-bar input {
+                width: 200px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card-ai {
+                grid-column: 1;
+                grid-row: auto;
+            }
+
+            .data-widgets {
+                grid-template-columns: 1fr;
+            }
+
+            .header h2 {
+                font-size: 1.1rem;
+            }
+
+            .search-bar {
+                display: none;
+            }
+
+            .dashboard-main {
+                padding: 20px;
+            }
+
+            #mobileMenuBtn {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 
@@ -663,7 +720,12 @@
     <div class="main-content">
 
         <header class="header">
-            <h2>Welcome, <span id="adminNameDisplay">Admin</span>!</h2>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="mobileMenuBtn" style="display: none; background: transparent; border: 1px solid var(--border-color); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer;">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h2>Welcome, <span id="adminNameDisplay">Admin</span>!</h2>
+            </div>
             <div class="header-actions">
                 <div class="search-bar">
                     <input type="text" id="globalSearch" placeholder="Search donors, patients...">
@@ -766,6 +828,19 @@
     <!-- Dashboard Integration Script -->
     <script src="../../js/dashboard.js"></script>
 
+    <script>
+        // Mobile Menu Toggle
+        document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.toggle('active');
+        });
+
+        // Close sidebar when clicking main content on mobile
+        document.querySelector('.main-content').addEventListener('click', () => {
+            if (window.innerWidth <= 1024) {
+                document.querySelector('.sidebar').classList.remove('active');
+            }
+        });
+    </script>
 </body>
 
 </html>
